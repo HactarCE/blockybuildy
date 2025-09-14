@@ -1,23 +1,92 @@
+use std::collections::HashMap;
 use std::fmt;
 
-use super::elements::ElemId;
-use super::grips::{GripId, HYPERCUBE_GRIPS};
+use super::elements::*;
+use super::grips::*;
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[static_init::dynamic]
+static TWIST_NAMES_3D: HashMap<Twist, String> = twist_names_3d();
+#[static_init::dynamic]
+static TWIST_NAMES_4D: HashMap<Twist, String> = twist_names_4d();
+
+#[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Twist {
     pub grip: GripId,
     pub transform: ElemId,
 }
+impl Twist {
+    pub fn new(grip: GripId, transform: ElemId) -> Self {
+        Self { grip, transform }
+    }
+}
+impl fmt::Debug for Twist {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}[{}]", self.grip, self.transform)
+    }
+}
 impl fmt::Display for Twist {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Some(g1) = HYPERCUBE_GRIPS
-            .into_iter()
-            .find(|&g| self.transform * g != g)
-        else {
-            return write!(f, "{}[.]", self.grip);
-        };
-        let g2 = self.transform * g1;
-        let g3 = self.transform * g2;
-        write!(f, "{}[{g1} -> {g2} -> {g3}]", self.grip)
+        if crate::USE_3D_TWIST_NAMES
+            && let Some(s) = TWIST_NAMES_3D.get(self)
+        {
+            write!(f, "{s}")
+        } else if let Some(s) = TWIST_NAMES_4D.get(self) {
+            write!(f, "{s}")
+        } else {
+            write!(f, "{self:?}")
+        }
     }
+}
+
+fn twist_names_3d() -> HashMap<Twist, String> {
+    let r = Twist::new(R, ZY);
+    let r2 = Twist::new(R, ZY * ZY);
+    let r3 = Twist::new(R, YZ);
+
+    let mut ret = HashMap::new();
+    for offset in *CUBE_ROTATIONS {
+        let r_grip = offset * R;
+        ret.entry(offset.transform(r))
+            .or_insert(format!("{r_grip}"));
+        ret.entry(offset.transform(r2))
+            .or_insert(format!("{r_grip}2"));
+        ret.entry(offset.transform(r3))
+            .or_insert(format!("{r_grip}'"));
+    }
+    ret
+}
+
+fn twist_names_4d() -> HashMap<Twist, String> {
+    let iu = Twist {
+        grip: I,
+        transform: XZ,
+    };
+    let iu2 = Twist {
+        grip: I,
+        transform: XZ * XZ,
+    };
+    let iur = Twist {
+        grip: I,
+        transform: YX * XZ * XZ,
+    };
+    let iurf = Twist {
+        grip: I,
+        transform: ZY * YX,
+    };
+
+    let mut ret = HashMap::new();
+    for offset in *HYPERCUBE_ROTATIONS {
+        let i = offset * I;
+        let u = offset * U;
+        let r = offset * R;
+        let f = offset * F;
+        ret.entry(offset.transform(iu)).or_insert(format!("{i}{u}"));
+        ret.entry(offset.transform(iu2))
+            .or_insert(format!("{i}{u}2"));
+        ret.entry(offset.transform(iur))
+            .or_insert(format!("{i}{u}{r}"));
+        ret.entry(offset.transform(iurf))
+            .or_insert(format!("{i}{u}{r}{f}"));
+    }
+    ret
 }

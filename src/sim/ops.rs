@@ -15,6 +15,10 @@ impl Mul for ElemId {
     }
 }
 
+pub trait TransformByElem {
+    fn transform_by(self, elem: ElemId) -> Self;
+}
+
 impl Mul<Vec4> for ElemId {
     type Output = Vec4;
 
@@ -47,6 +51,15 @@ impl Mul<Piece> for ElemId {
         Piece {
             grips: self * rhs.grips,
             attitude: self * rhs.attitude,
+        }
+    }
+}
+
+impl TransformByElem for Twist {
+    fn transform_by(self, elem: ElemId) -> Self {
+        Twist {
+            grip: elem * self.grip,
+            transform: elem * self.transform * elem.inv(),
         }
     }
 }

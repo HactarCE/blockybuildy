@@ -1,6 +1,9 @@
+use std::fmt;
+
 use itertools::Itertools;
 
 use super::group;
+use super::ops::TransformByElem;
 use super::space::*;
 
 /// Elements in the group of rotations of a hypercube.
@@ -19,6 +22,40 @@ pub static CUBE_ROTATIONS: [ElemId; 24] = group::stabilizer(HYPERCUBE_ROTATIONS.
 /// Element from the grip group.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ElemId(pub u8);
+
+impl ElemId {
+    /// Returns the inverse element.
+    pub fn inv(self) -> ElemId {
+        group::CHIRAL_BC4.inv_elem[self.0 as usize]
+    }
+
+    pub fn transform<T: TransformByElem>(self, obj: T) -> T {
+        obj.transform_by(self)
+    }
+}
+
+impl fmt::Display for ElemId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut grips_moved = super::grips::HYPERCUBE_GRIPS
+            .into_iter()
+            .filter(|&g| *self * g != g);
+        if let Some(g1) = grips_moved.next() {
+            let g2 = *self * g1;
+            let g3 = *self * g2;
+            write!(f, "{g1} -> {g2} -> {g3}")?;
+            if g1 == g3
+                && let Some(g4) = grips_moved.find(|&g| g != g2)
+            {
+                let g5 = *self * g4;
+                let g6 = *self * g5;
+                write!(f, ", {g4} -> {g5} -> {g6}")?;
+            }
+            Ok(())
+        } else {
+            write!(f, "{self:?}")
+        }
+    }
+}
 
 /// Identity group element.
 pub const IDENT: ElemId = ElemId(0);

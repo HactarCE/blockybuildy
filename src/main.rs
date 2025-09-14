@@ -4,6 +4,8 @@ pub mod sim;
 
 pub use sim::*;
 
+pub const USE_3D_TWIST_NAMES: bool = false;
+
 fn main() {
     // for t in &RUBIKS_3D.twists {
     //     println!("{t}");
