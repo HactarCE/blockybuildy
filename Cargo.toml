@@ -1,0 +1,26 @@
+[package]
+name = "blockybuildy"
+version = "0.1.0"
+authors = ["Andrew Farkas <hellop@ajfarkas.dev>"]
+license = "MIT OR Apache-2.0"
+edition = "2024"
+rust-version = "1.89"
+repository = "https://github.com/HactarCE/blockybuildy/"
+
+[lints.rust]
+rust_2018_idioms = "warn"
+
+[lints.clippy]
+if_then_some_else_none = "warn"
+manual_let_else = "warn"
+semicolon_if_nothing_returned = "warn"
+semicolon_inside_block = "warn"
+stable_sort_primitive = "warn"
+undocumented_unsafe_blocks = "warn"
+uninlined_format_args = "warn"
+
+[dependencies]
+cgmath = "0.18.0"
+itertools = "0.14.0"
+rand = "0.9.2"
+static_init = "1.0.4"

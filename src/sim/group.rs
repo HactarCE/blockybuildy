@@ -1,0 +1,99 @@
+use itertools::Itertools;
+
+use super::elements::ElemId;
+use super::grips::{GripId, HYPERCUBE_GRIPS};
+use super::space::*;
+
+pub const ELEM_COUNT: usize = 192;
+
+/// Chiral subgroup of Coxeter group BC4 (i.e., the group of rotations of a
+/// hypercube).
+#[static_init::dynamic]
+pub static CHIRAL_BC4: Group = Group::bc4();
+
+/// Grip group of the puzzle.
+pub struct Group {
+    pub mul_elem_elem: [[ElemId; ELEM_COUNT]; ELEM_COUNT],
+    pub mul_elem_vec: [[Vec4; 4]; ELEM_COUNT],
+    pub mul_elem_grip: [[GripId; 8]; 192],
+}
+impl Group {
+    pub fn bc4() -> Self {
+        let ident = Mat4::from_cols(X, Y, Z, W);
+        let xy = Mat4::from_cols(Y, -X, Z, W);
+        let xz = Mat4::from_cols(Z, Y, -X, W);
+        let xw = Mat4::from_cols(W, Y, Z, -X);
+
+        let mut elems = vec![ident];
+        let mut last_unproc = 0;
+        while last_unproc < elems.len() {
+            let init = elems[last_unproc];
+            for g in [xy, xz, xw] {
+                let new = matmul(init, g);
+                if !elems.contains(&new) {
+                    elems.push(new);
+                }
+            }
+            last_unproc += 1;
+        }
+
+        let index_of = |q| elems.iter().position(|&m| m == q).unwrap();
+
+        let mul_elem_elem: [[ElemId; 192]; 192] = elems
+            .iter()
+            .map(|&a| {
+                elems
+                    .iter()
+                    .map(|&b| ElemId(index_of(matmul(a, b)) as u8))
+                    .collect_array::<192>()
+                    .unwrap()
+            })
+            .collect_array::<192>()
+            .unwrap();
+
+        let mul_elem_vec: [[Vec4; 4]; 192] = elems
+            .iter()
+            .map(|&m| [X, Y, Z, W].map(|v| vecmul(m, v)))
+            .collect_array::<192>()
+            .unwrap();
+
+        let mul_elem_grip = mul_elem_vec.map(|mat| {
+            HYPERCUBE_GRIPS.map(|g| {
+                HYPERCUBE_GRIPS
+                    .iter()
+                    .position(|g2| g2.vec() == mat[g.axis()] * g.signum())
+                    .map(|i| GripId(i as u8))
+                    .unwrap()
+            })
+        });
+
+        Self {
+            mul_elem_elem,
+            mul_elem_vec,
+            mul_elem_grip,
+        }
+    }
+}
+
+pub fn matmul(a: Mat4, b: Mat4) -> Mat4 {
+    (a.cast::<f32>().unwrap() * b.cast::<f32>().unwrap())
+        .cast()
+        .unwrap()
+}
+
+pub fn vecmul(a: Mat4, b: Vec4) -> Vec4 {
+    (a.cast::<f32>().unwrap() * b.cast::<f32>().unwrap())
+        .cast()
+        .unwrap()
+}
+
+pub fn fixes_vector(e: ElemId, v: Vec4) -> bool {
+    e * v == v
+}
+
+pub fn stabilizer(
+    group: impl IntoIterator<Item = ElemId>,
+    v: Vec4,
+) -> impl Iterator<Item = ElemId> {
+    group.into_iter().filter(move |&e| fixes_vector(e, v))
+}
