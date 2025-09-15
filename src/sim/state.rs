@@ -2,10 +2,9 @@ use std::fmt;
 
 use itertools::Itertools;
 
-use crate::StackVec;
-
 use super::grip_set::{Block, Piece};
 use super::twists::Twist;
+use crate::StackVec;
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PuzzleState {
@@ -18,13 +17,15 @@ impl PuzzleState {
     /// track.
     #[must_use]
     pub fn do_twist(self, twist: Twist) -> Option<Self> {
-        let blocks_iter = self
-            .blocks
-            .into_iter()
-            .flat_map(|block| twist * block)
-            .sorted_unstable_by_key(|b| b.attitude());
+        let new_blocks = StackVec::<Block, { crate::MAX_BLOCKS }>::from_iter(
+            self.blocks
+                .into_iter()
+                .flat_map(|block| twist * block)
+                .filter_map(|x| x),
+        )?
+        .sorted_unstable_by_key(|b| b.attitude());
 
-        self.from_blocks(blocks_iter)
+        self.from_blocks(new_blocks.into_iter())
     }
 
     #[must_use]
@@ -67,7 +68,7 @@ impl PuzzleState {
     pub fn add_piece(&mut self, piece: Piece) {
         *self = self
             .from_blocks(self.blocks.into_iter().chain([piece.into()]))
-            .unwrap();
+            .expect("exceeded block limit. increase MAX_BLOCKS.");
     }
 }
 impl fmt::Display for PuzzleState {
@@ -81,7 +82,8 @@ impl fmt::Display for PuzzleState {
 
 #[cfg(test)]
 mod tests {
-    use crate::{StackVec, sim::*};
+    use crate::StackVec;
+    use crate::sim::*;
 
     #[test]
     fn test_puzzle_state() {

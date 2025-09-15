@@ -123,10 +123,20 @@ impl fmt::Display for Piece {
 
 /// Block of pieces with compatible attitudes, displayed as
 /// `ACTIVE_GRIPS$blocked_grips!INACTIVE_GRIPS`.
-#[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Block {
     layers: PackedLayers,
     attitude: ElemId,
+}
+// same as `#[derive(Default)]` but easier for the compiler to inline
+impl Default for Block {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            layers: PackedLayers::EMPTY,
+            attitude: IDENT,
+        }
+    }
 }
 impl From<Piece> for Block {
     fn from(value: Piece) -> Self {
@@ -243,27 +253,25 @@ impl fmt::Display for Block {
 }
 
 impl Mul<Block> for Twist {
-    type Output = StackVec<Block, 2>;
+    type Output = [Option<Block>; 2];
 
     fn mul(self, rhs: Block) -> Self::Output {
         let [inside, outside] = rhs.split(self.grip);
-        let mut ret = StackVec::new();
-        ret = ret
-            .extend(inside.map(|b| Block {
+        [
+            inside.map(|b| Block {
                 layers: self.transform * b.layers,
                 attitude: self.transform * b.attitude,
-            }))
-            .unwrap();
-        ret = ret.extend(outside).unwrap();
-        ret
+            }),
+            outside,
+        ]
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use proptest::prelude::*;
+
+    use super::*;
 
     impl Arbitrary for Block {
         type Parameters = ();
