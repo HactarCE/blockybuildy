@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
 
+use itertools::Itertools;
+
 use super::elements::*;
 use super::grips::*;
 
@@ -89,10 +91,21 @@ fn twist_names_4d() -> HashMap<Twist, String> {
         ret.entry(offset.transform(iu)).or_insert(format!("{i}{u}"));
         ret.entry(offset.transform(iu2))
             .or_insert(format!("{i}{u}2"));
+        let [a, b] = hsc1_sort([u, r]);
         ret.entry(offset.transform(iur))
-            .or_insert(format!("{i}{u}{r}"));
+            .or_insert(format!("{i}{a}{b}"));
+        let [a, b, c] = hsc1_sort([u, r, f]);
         ret.entry(offset.transform(iurf))
-            .or_insert(format!("{i}{u}{r}{f}"));
+            .or_insert(format!("{i}{a}{b}{c}"));
     }
     ret
+}
+
+/// Sort a list of unique grips according to the order used in HSC1 log files.
+fn hsc1_sort<const N: usize>(grips: [GripId; N]) -> [GripId; N] {
+    [U, D, F, B, R, L, O, I]
+        .into_iter()
+        .filter(|g| grips.contains(g))
+        .collect_array()
+        .expect("duplicate grips in twist name")
 }
