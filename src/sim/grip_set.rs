@@ -1,7 +1,7 @@
 use std::fmt;
 use std::ops::{Add, AddAssign, BitAnd, BitOr, BitXor, Mul, Not, Sub, SubAssign};
 
-use crate::{StackVec, Twist};
+use crate::{GripStatus, StackVec, Twist};
 
 use super::elements::{ElemId, IDENT};
 use super::grips::*;
@@ -160,6 +160,45 @@ impl Block {
 
     pub fn attitude(self) -> ElemId {
         self.attitude
+    }
+
+    pub fn is_subset_of(self, other: Self) -> bool {
+        self.attitude == other.attitude && self.layers.is_subset_of(other.layers)
+    }
+
+    pub fn active_grips(self) -> GripSet {
+        self.grips_with_status(GripStatus::Active)
+    }
+    pub fn inactive_grips(self) -> GripSet {
+        self.grips_with_status(GripStatus::Inactive)
+    }
+    pub fn blocked_grips(self) -> GripSet {
+        self.grips_with_status(GripStatus::Blocked)
+    }
+    fn grips_with_status(self, status: GripStatus) -> GripSet {
+        HYPERCUBE_GRIPS
+            .into_iter()
+            .filter(|&g| self.layers.grip_status(g) == Some(status))
+            .collect()
+    }
+
+    #[must_use]
+    pub fn expand_to_active_grip(self, grip: GripId) -> Self {
+        Self {
+            layers: self.layers.expand_to_active_grip(grip),
+            attitude: self.attitude,
+        }
+    }
+
+    pub fn contains_piece(self, piece: Piece) -> bool {
+        HYPERCUBE_GRIPS.into_iter().all(|g| {
+            let forbidden_status = if piece.grips.contains(g) {
+                GripStatus::Inactive
+            } else {
+                GripStatus::Active
+            };
+            self.layers.grip_status(g) != Some(forbidden_status)
+        })
     }
 
     //// Returns `[inside, outside]`

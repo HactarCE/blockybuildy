@@ -1,63 +1,139 @@
+use itertools::Itertools;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::collections::HashSet;
+
 pub mod sim;
 pub mod stackvec;
 
-use itertools::Itertools;
 pub use sim::*;
 pub use stackvec::StackVec;
 
 pub const USE_3D_TWIST_NAMES: bool = true;
-pub const MAX_BLOCKS: usize = 10; // 5 is a nice number
+pub const MAX_BLOCKS: usize = 15; // 5 is a nice number
 
 pub const MAX_DEPTH: usize = 5;
 
-const SCRAMBLE: &str = "R' D2 B U B D F' R' F2 L2 D' R2 D2 F2 D2 L2 B2 D L2 B";
+const SCRAMBLE: &str = "U' B2 U2 L2 B2 U2 L F2 L' U2 R2 F2 L' B L B D' F' D2 L' B";
 
 fn main() {
     let scramble = parse_twists(SCRAMBLE);
-    let init_piece = |solution: &[Twist], piece: &[GripId]| {
-        let piece = Piece::new_solved(piece.iter().copied());
+    let init_piece = |solution: &[Twist], piece: Piece| {
         let all_twists = scramble.iter().chain(solution);
         all_twists.fold(piece, |p, &twist| twist * p)
     };
+    let add_pieces = |state: &mut PuzzleState, solution: &[Twist], pieces: Vec<Piece>| {
+        for piece in pieces {
+            state.add_piece(init_piece(&solution, piece));
+        }
+    };
 
-    let mut solution = vec![];
-    let mut solution_str = String::new();
+    let solution = vec![];
+    let solution_str = String::new();
 
     let t = std::time::Instant::now();
 
-    let mut state = PuzzleState::default();
-    println!("\nStage 1");
-    state.add_piece(init_piece(&solution, &[]));
-    state.add_piece(init_piece(&solution, &[U]));
-    state.add_piece(init_piece(&solution, &[U, R]));
-    state.add_piece(init_piece(&solution, &[R]));
-    ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1);
-    println!("\nStage 2");
-    state.add_piece(init_piece(&solution, &[F]));
-    state.add_piece(init_piece(&solution, &[F, U]));
-    state.add_piece(init_piece(&solution, &[F, U, R]));
-    state.add_piece(init_piece(&solution, &[F, R]));
-    ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1);
-    println!("\nStage 3");
-    state.add_piece(init_piece(&solution, &[B]));
-    state.add_piece(init_piece(&solution, &[B, U]));
-    state.add_piece(init_piece(&solution, &[B, U, R]));
-    state.add_piece(init_piece(&solution, &[B, R]));
-    ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1);
-    println!("\nStage 4");
-    state.add_piece(init_piece(&solution, &[L]));
-    state.add_piece(init_piece(&solution, &[L, U]));
-    state.add_piece(init_piece(&solution, &[L, U, F]));
-    state.add_piece(init_piece(&solution, &[L, F]));
-    ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 2);
-    println!("\nStage 5");
-    state.add_piece(init_piece(&solution, &[L, U, B]));
-    state.add_piece(init_piece(&solution, &[L, B]));
-    ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1);
+    let (solution, solution_str) = initial_petrus_blocks()
+        .into_par_iter()
+        .map(|block1| {
+            let mut solution = solution.clone();
+            let mut solution_str = solution_str.clone();
+            let mut state = PuzzleState::default();
+            let new_pieces = pieces_from_block(block1).collect();
+            add_pieces(&mut state, &solution, new_pieces);
+            if !ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1) {
+                println!("  Abandoning 2x2x2 block attempt");
+                return None;
+            }
+
+            extensions(block1)
+                .into_par_iter()
+                .map(|block2| {
+                    let mut solution = solution.clone();
+                    let mut solution_str = solution_str.clone();
+                    let mut state = state.clone();
+                    let new_pieces = new_pieces_from_block(block2, block1);
+                    add_pieces(&mut state, &solution, new_pieces);
+                    if !ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1) {
+                        println!("  Abandoning 2x2x3 block attempt");
+                        return None;
+                    }
+
+                    extensions(block2)
+                        .into_par_iter()
+                        .map(|block3| {
+                            let mut solution = solution.clone();
+                            let mut solution_str = solution_str.clone();
+                            let mut state = state.clone();
+                            let new_pieces = new_pieces_from_block(block3, block2);
+                            add_pieces(&mut state, &solution, new_pieces);
+                            if !ibb_iddfs(
+                                &RUBIKS_3D,
+                                &mut state,
+                                &mut solution,
+                                &mut solution_str,
+                                1,
+                            ) {
+                                println!("  Abandoning 2x3x3 block attempt");
+                                return None;
+                            }
+
+                            Some((solution, solution_str))
+                        })
+                        .filter_map(|x| x)
+                        .min_by_key(|(solution, _)| solution.len())
+                })
+                .filter_map(|x| x)
+                .min_by_key(|(solution, _)| solution.len())
+        })
+        .filter_map(|x| x)
+        .min_by_key(|(solution, _)| solution.len())
+        .expect("no solution");
+
     println!();
     println!();
     println!("whole solution: {solution_str}");
     println!("{} ETM in {:?}", solution.len(), t.elapsed());
+}
+
+fn initial_petrus_blocks() -> Vec<Block> {
+    itertools::iproduct!([R, L], [U, D], [F, B])
+        .filter_map(|(x, y, z)| Block::new_solved([], [x, y, z]))
+        .collect()
+}
+
+fn extensions(block: Block) -> Vec<Block> {
+    block
+        .inactive_grips()
+        .iter()
+        .map(|g| block.expand_to_active_grip(g))
+        .collect()
+}
+
+fn new_pieces_from_block(new_block: Block, old_block: Block) -> Vec<Piece> {
+    assert!(old_block.is_subset_of(new_block));
+    let mut pieces = pieces_from_block(new_block).collect::<HashSet<Piece>>();
+    for piece in pieces_from_block(old_block) {
+        pieces.remove(&piece);
+    }
+    pieces.into_iter().collect()
+}
+
+fn pieces_from_block(block: Block) -> impl Iterator<Item = Piece> {
+    assert_eq!(block.attitude(), IDENT);
+    let mut blocks = vec![block];
+    for g in block.blocked_grips().iter() {
+        if g == I || g == O {
+            continue;
+        }
+        blocks = blocks
+            .into_iter()
+            .flat_map(|b| b.split(g))
+            .filter_map(|b| b)
+            .collect();
+    }
+    blocks
+        .into_iter()
+        .map(|b| Piece::new_solved(b.active_grips().iter()))
 }
 
 /// iterative blockbuilding iddfs
@@ -67,23 +143,26 @@ fn ibb_iddfs(
     solution: &mut Vec<Twist>,
     solution_str: &mut String,
     min_blocks: usize,
-) {
+) -> bool {
     while state.blocks.len() > min_blocks {
-        println!(
-            "  We currently have {} blocks. Trying to get {min_blocks} blocks ...",
-            state.blocks.len()
-        );
+        // println!(
+        //     "  We currently have {} blocks. Trying to get {min_blocks} blocks ...",
+        //     state.blocks.len()
+        // );
         let t = std::time::Instant::now();
-        let new_twists = (min_blocks..state.blocks.len())
+        let Some(new_twists) = (min_blocks..state.blocks.len())
             .rev()
             .map_while(|expected_blocks| {
-                println!("    Searching for {expected_blocks} blocks ...");
+                // println!("    Searching for {expected_blocks} blocks ...");
                 iddfs_to_solved(puzzle, *state, expected_blocks)
             })
             .last()
-            .expect("no solution found within depth");
+        else {
+            return false; // can't even get 1 block within reasonable depth
+        };
         confirm_solution(state, solution, solution_str, new_twists, t);
     }
+    true
 }
 
 fn confirm_solution(
@@ -113,7 +192,7 @@ fn iddfs_to_solved(
     expected_blocks: usize,
 ) -> Option<Vec<Twist>> {
     for max_depth in 0..=MAX_DEPTH {
-        println!("      Searching at depth {max_depth} ...");
+        // println!("      Searching at depth {max_depth} ...");
         let mut new_twists = vec![];
         if dfs_to_solved(puzzle, state, &mut new_twists, expected_blocks, max_depth) {
             return Some(new_twists);

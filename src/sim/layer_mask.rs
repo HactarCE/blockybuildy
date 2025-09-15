@@ -35,6 +35,17 @@ impl PackedLayers {
     pub const fn restrict_to_inactive_grip(self, g: GripId) -> Self {
         Self::from_u16(self.to_u16() & !active_grip_mask(g))
     }
+    #[must_use]
+    pub fn expand_to_active_grip(self, g: GripId) -> Self {
+        Self::from_u16(
+            self.to_u16()
+                | if self.grip_status(g.opposite()) == Some(GripStatus::Active) {
+                    inactive_grip_mask(g.opposite())
+                } else {
+                    active_grip_mask(g)
+                },
+        )
+    }
 
     pub fn is_empty_on_any_axis(self) -> bool {
         let bits = self.to_u16();

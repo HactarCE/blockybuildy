@@ -4,7 +4,7 @@ Experimental blockbuilding-based search program for solving 3D and 4D Rubik's cu
 
 ## Optimizations (to-do)
 
-- [ ] meta search over block extensions
+- [x] meta search over block extensions
 - [ ] don't move the same grip twice within one search
 - [ ] make supercenters optional (and superridges in 4D)
 - [ ] prune based on optimistic block formation heuristics
