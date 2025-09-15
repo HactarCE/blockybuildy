@@ -6,9 +6,11 @@ pub use sim::*;
 pub use stackvec::StackVec;
 
 pub const USE_3D_TWIST_NAMES: bool = true;
-pub const MAX_BLOCKS: usize = 6; // 5 is a nice number
+pub const MAX_BLOCKS: usize = 10; // 5 is a nice number
 
-const SCRAMBLE: &str = "U2 B2 R2 D' F2 U' L2 U2 L2 U R2 U R F R U2 R F' U' B' U2";
+pub const MAX_DEPTH: usize = 5;
+
+const SCRAMBLE: &str = "R' D2 B U B D F' R' F2 L2 D' R2 D2 F2 D2 L2 B2 D L2 B";
 
 fn main() {
     let scramble = parse_twists(SCRAMBLE);
@@ -29,77 +31,95 @@ fn main() {
     state.add_piece(init_piece(&solution, &[U]));
     state.add_piece(init_piece(&solution, &[U, R]));
     state.add_piece(init_piece(&solution, &[R]));
-    // iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 2);
-    iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1);
+    ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1);
     println!("\nStage 2");
     state.add_piece(init_piece(&solution, &[F]));
     state.add_piece(init_piece(&solution, &[F, U]));
     state.add_piece(init_piece(&solution, &[F, U, R]));
     state.add_piece(init_piece(&solution, &[F, R]));
-    // iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 4);
-    iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 3);
-    // iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 2);
-    iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1);
+    ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1);
     println!("\nStage 3");
     state.add_piece(init_piece(&solution, &[B]));
     state.add_piece(init_piece(&solution, &[B, U]));
     state.add_piece(init_piece(&solution, &[B, U, R]));
     state.add_piece(init_piece(&solution, &[B, R]));
-    // iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 4);
-    // iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 3);
-    // iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 2);
-    iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1);
+    ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1);
     println!("\nStage 4");
     state.add_piece(init_piece(&solution, &[L]));
     state.add_piece(init_piece(&solution, &[L, U]));
     state.add_piece(init_piece(&solution, &[L, U, F]));
     state.add_piece(init_piece(&solution, &[L, F]));
-    // iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 4);
-    // iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 3);
-    iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 2);
+    ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 2);
     println!("\nStage 5");
     state.add_piece(init_piece(&solution, &[L, U, B]));
     state.add_piece(init_piece(&solution, &[L, B]));
-    iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 3);
-    // iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 2);
-    iddfs_to_solved(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1);
+    ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1);
     println!();
     println!();
     println!("whole solution: {solution_str}");
     println!("{} ETM in {:?}", solution.len(), t.elapsed());
 }
 
-fn iddfs_to_solved(
+/// iterative blockbuilding iddfs
+fn ibb_iddfs(
     puzzle: &Puzzle,
     state: &mut PuzzleState,
     solution: &mut Vec<Twist>,
     solution_str: &mut String,
-    expected_blocks: usize,
+    min_blocks: usize,
 ) {
-    println!(
-        "  We currently have {} blocks. Trying to get {expected_blocks} ...",
-        state.blocks.len()
-    );
-    for max_depth in 0.. {
+    while state.blocks.len() > min_blocks {
+        println!(
+            "  We currently have {} blocks. Trying to get {min_blocks} blocks ...",
+            state.blocks.len()
+        );
         let t = std::time::Instant::now();
-        println!("    Searching at depth {max_depth} ...");
+        let new_twists = (min_blocks..state.blocks.len())
+            .rev()
+            .map_while(|expected_blocks| {
+                println!("    Searching for {expected_blocks} blocks ...");
+                iddfs_to_solved(puzzle, *state, expected_blocks)
+            })
+            .last()
+            .expect("no solution found within depth");
+        confirm_solution(state, solution, solution_str, new_twists, t);
+    }
+}
+
+fn confirm_solution(
+    state: &mut PuzzleState,
+    solution: &mut Vec<Twist>,
+    solution_str: &mut String,
+    new_twists: Vec<Twist>,
+    start: std::time::Instant,
+) {
+    solution_str.push_str(&format!(" ({})", new_twists.iter().join(" ")));
+    for new_twist in new_twists {
+        *state = state.do_twist(new_twist).unwrap();
+        solution.push(new_twist);
+    }
+    let elapsed = start.elapsed();
+    println!(
+        "    Solution found in {elapsed:?}! We now have {} blocks",
+        state.blocks.len(),
+    );
+    println!("  Solution so far: {}", solution.iter().join(" "));
+    return;
+}
+
+fn iddfs_to_solved(
+    puzzle: &Puzzle,
+    state: PuzzleState,
+    expected_blocks: usize,
+) -> Option<Vec<Twist>> {
+    for max_depth in 0..=MAX_DEPTH {
+        println!("      Searching at depth {max_depth} ...");
         let mut new_twists = vec![];
-        if dfs_to_solved(puzzle, *state, &mut new_twists, expected_blocks, max_depth) {
-            solution_str.push_str(&format!(" ({})", new_twists.iter().join(" ")));
-            for new_twist in new_twists {
-                *state = state.do_twist(new_twist).unwrap();
-                solution.push(new_twist);
-            }
-            let elapsed = t.elapsed();
-            println!(
-                "    Solution found in {elapsed:?}! We now have {}",
-                state.blocks.len()
-            );
-            println!("  Solution so far: {}", solution.iter().join(" "));
-            return;
+        if dfs_to_solved(puzzle, state, &mut new_twists, expected_blocks, max_depth) {
+            return Some(new_twists);
         }
     }
-    unreachable!()
+    None
 }
 
 fn dfs_to_solved(
