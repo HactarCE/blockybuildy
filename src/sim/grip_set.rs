@@ -158,12 +158,19 @@ impl Block {
         Some(Self { layers, attitude })
     }
 
+    pub fn layers(self) -> PackedLayers {
+        self.layers
+    }
     pub fn attitude(self) -> ElemId {
         self.attitude
     }
 
     pub fn is_subset_of(self, other: Self) -> bool {
         self.attitude == other.attitude && self.layers.is_subset_of(other.layers)
+    }
+
+    pub fn grip_status(self, grip: GripId) -> Option<GripStatus> {
+        self.layers.grip_status(grip)
     }
 
     pub fn active_grips(self) -> GripSet {

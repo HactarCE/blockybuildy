@@ -55,3 +55,11 @@ pub struct GripData {
     /// Elements from the grip group that fix this grip.
     pub transforms: Vec<ElemId>,
 }
+impl GripData {
+    pub fn twists(&self) -> impl Iterator<Item = Twist> {
+        let grip = self.id;
+        self.transforms
+            .iter()
+            .map(move |&transform| Twist { grip, transform })
+    }
+}

@@ -10,27 +10,29 @@ pub use stackvec::StackVec;
 
 pub const IS_3D: bool = false;
 
+// pub const MAX_BLOCKS: usize = 10;
+pub const MAX_BLOCKS: usize = 31;
+// bigger number is sometimes better???
+
 pub const USE_3D_TWIST_NAMES: bool = IS_3D;
-pub const MAX_BLOCKS: usize = 30; // 5 is a nice number
-
-pub const MAX_DEPTH: usize = 3;
-
-const SCRAMBLE_3D: &str = "U' B2 U2 L2 B2 U2 L F2 L' U2 R2 F2 L' B L B D' F' D2 L' B";
-const SCRAMBLE_4D: &str = "IDFL LF UBI IUB IL2 RUBO IUBR DO DLO IUBL UI2 ID FULI LUBO OUF DFRI DL BULO FLI LUBI FR BLO UBO UBRO OUFL IU RFI BR2 RI ID IB2 OUBL RUBO DFLO DFRO BO BDL UFRO OUFL ID BURO IBL OUL BD IBL DBLI FDLO BUO DBLO FLO LDF BRO ID FLI IUF OL OL OBL ULO BUO FURI UL2 BR FDLO IUBL UBLO IBL BR2 IUBL BURO IU2 DF ODBL LDBO BR RUB LUBI IU2 FURI IUL OUL ODBR OL2 IB DL UB BO OUB FL2 DFRO ODBR UFRI RI RUFI RDBO IUR UBO BUL RDFI LUFO";
 
 fn main() {
     if IS_3D {
-        search_3d();
+        let scramble = "U' B2 U2 L2 B2 U2 L F2 L' U2 R2 F2 L' B L B D' F' D2 L' B";
+        let max_depth = 5;
+        search_3d(scramble, max_depth);
     } else {
-        // scramble_4d();
-        search_4d();
+        // let scramble = scramble_4d();
+        let scramble = "IDFL LF UBI IUB IL2 RUBO IUBR DO DLO IUBL UI2 ID FULI LUBO OUF DFRI DL BULO FLI LUBI FR BLO UBO UBRO OUFL IU RFI BR2 RI ID IB2 OUBL RUBO DFLO DFRO BO BDL UFRO OUFL ID BURO IBL OUL BD IBL DBLI FDLO BUO DBLO FLO LDF BRO ID FLI IUF OL OL OBL ULO BUO FURI UL2 BR FDLO IUBL UBLO IBL BR2 IUBL BURO IU2 DF ODBL LDBO BR RUB LUBI IU2 FURI IUL OUL ODBR OL2 IB DL UB BO OUB FL2 DFRO ODBR UFRI RI RUFI RDBO IUR UBO BUL RDFI LUFO";
+        let max_depth = 3;
+        search_4d(&scramble, max_depth);
     }
 }
 
-fn search_4d() {
-    let scramble = parse_twists(SCRAMBLE_4D);
+fn search_4d(scramble: &str, max_depth: usize) {
+    let scramble_twists = parse_twists(scramble);
     let init_piece = |solution: &[Twist], piece: Piece| {
-        let all_twists = scramble.iter().chain(solution);
+        let all_twists = scramble_twists.iter().chain(solution);
         all_twists.fold(piece, |p, &twist| twist * p)
     };
     let add_pieces = |state: &mut PuzzleState, solution: &[Twist], pieces: Vec<Piece>| {
@@ -45,15 +47,21 @@ fn search_4d() {
     let t = std::time::Instant::now();
 
     let (solution, solution_str) = initial_4d_blocks()
-        .into_iter()
-        .next()
+        .into_par_iter()
         .map(|block1| {
             let mut solution = solution.clone();
             let mut solution_str = solution_str.clone();
             let mut state = PuzzleState::default();
             let new_pieces = pieces_from_block(block1).collect();
             add_pieces(&mut state, &solution, new_pieces);
-            if !ibb_iddfs(&RUBIKS_4D, &mut state, &mut solution, &mut solution_str, 1) {
+            if !ibb_iddfs(
+                &RUBIKS_4D,
+                &mut state,
+                &mut solution,
+                &mut solution_str,
+                1,
+                max_depth,
+            ) {
                 println!("  Abandoning 2x2x2x2 block attempt");
                 return None;
             }
@@ -98,8 +106,12 @@ fn search_4d() {
             //     .filter_map(|x| x)
             //     .min_by_key(|(solution, _)| solution.len())
         })
-        .into_iter()
         .filter_map(|x| x)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .inspect(|(s, _)| {
+            dbg!(s.len());
+        })
         .min_by_key(|(solution, _)| solution.len())
         .expect("no solution");
 
@@ -109,17 +121,14 @@ fn search_4d() {
     println!("{} ETM in {:?}", solution.len(), t.elapsed());
 }
 
-fn scramble_4d() {
-    println!(
-        "{}",
-        RUBIKS_4D.random_moves(100).map(|t| t.to_string()).join(" ")
-    );
+fn scramble_4d() -> String {
+    RUBIKS_4D.random_moves(100).map(|t| t.to_string()).join(" ")
 }
 
-fn search_3d() {
-    let scramble = parse_twists(SCRAMBLE_3D);
+fn search_3d(scramble: &str, max_depth: usize) {
+    let scramble_twists = parse_twists(scramble);
     let init_piece = |solution: &[Twist], piece: Piece| {
-        let all_twists = scramble.iter().chain(solution);
+        let all_twists = scramble_twists.iter().chain(solution);
         all_twists.fold(piece, |p, &twist| twist * p)
     };
     let add_pieces = |state: &mut PuzzleState, solution: &[Twist], pieces: Vec<Piece>| {
@@ -141,7 +150,14 @@ fn search_3d() {
             let mut state = PuzzleState::default();
             let new_pieces = pieces_from_block(block1).collect();
             add_pieces(&mut state, &solution, new_pieces);
-            if !ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1) {
+            if !ibb_iddfs(
+                &RUBIKS_3D,
+                &mut state,
+                &mut solution,
+                &mut solution_str,
+                1,
+                max_depth,
+            ) {
                 println!("  Abandoning 2x2x2 block attempt");
                 return None;
             }
@@ -154,7 +170,14 @@ fn search_3d() {
                     let mut state = state.clone();
                     let new_pieces = new_pieces_from_block(block2, block1);
                     add_pieces(&mut state, &solution, new_pieces);
-                    if !ibb_iddfs(&RUBIKS_3D, &mut state, &mut solution, &mut solution_str, 1) {
+                    if !ibb_iddfs(
+                        &RUBIKS_3D,
+                        &mut state,
+                        &mut solution,
+                        &mut solution_str,
+                        1,
+                        max_depth,
+                    ) {
                         println!("  Abandoning 2x2x3 block attempt");
                         return None;
                     }
@@ -173,6 +196,7 @@ fn search_3d() {
                                 &mut solution,
                                 &mut solution_str,
                                 1,
+                                max_depth,
                             ) {
                                 println!("  Abandoning 2x3x3 block attempt");
                                 return None;
@@ -250,6 +274,7 @@ fn ibb_iddfs(
     solution: &mut Vec<Twist>,
     solution_str: &mut String,
     min_blocks: usize,
+    max_depth: usize,
 ) -> bool {
     while state.blocks.len() > min_blocks {
         println!(
@@ -260,8 +285,8 @@ fn ibb_iddfs(
         let Some(new_twists) = (min_blocks..state.blocks.len())
             .rev()
             .map_while(|expected_blocks| {
-                println!("    Searching for {expected_blocks} blocks ...");
-                iddfs_to_solved(puzzle, *state, expected_blocks)
+                // println!("    Searching for {expected_blocks} blocks ...");
+                iddfs_to_solved(puzzle, *state, expected_blocks, max_depth)
             })
             .last()
         else {
@@ -285,10 +310,10 @@ fn confirm_solution(
         solution.push(new_twist);
     }
     let elapsed = start.elapsed();
-    println!(
-        "    Solution found in {elapsed:?}! We now have {} blocks",
-        state.blocks.len(),
-    );
+    // println!(
+    //     "    Solution found in {elapsed:?}! We now have {} blocks",
+    //     state.blocks.len(),
+    // );
     println!("  Solution so far: {}", solution.iter().join(" "));
     return;
 }
@@ -297,11 +322,12 @@ fn iddfs_to_solved(
     puzzle: &Puzzle,
     state: PuzzleState,
     expected_blocks: usize,
+    max_depth: usize,
 ) -> Option<Vec<Twist>> {
-    for max_depth in 0..=MAX_DEPTH {
-        println!("      Searching at depth {max_depth} ...");
+    for depth in 0..=max_depth {
+        // println!("      Searching at depth {depth_limit} ...");
         let mut new_twists = vec![];
-        if dfs_to_solved(puzzle, state, &mut new_twists, expected_blocks, max_depth) {
+        if dfs_to_solved(puzzle, state, &mut new_twists, expected_blocks, depth, None) {
             return Some(new_twists);
         }
     }
@@ -313,21 +339,52 @@ fn dfs_to_solved(
     state: PuzzleState,
     solution: &mut Vec<Twist>,
     expected_blocks: usize,
-    max_depth: usize,
+    remaining_depth: usize,
+    last_grip: Option<GripId>,
 ) -> bool {
     if state.blocks.len() <= expected_blocks {
         return true;
     }
-    if max_depth == 0 {
+    if remaining_depth == 0 {
         return false;
     }
-    for &twist in &puzzle.twists {
-        if let Some(new_state) = state.do_twist(twist) {
-            solution.push(twist);
-            if dfs_to_solved(puzzle, new_state, solution, expected_blocks, max_depth - 1) {
-                return true;
+
+    // Do we have a chance of solving `expected_blocks` within `max_depth`?
+    let remaining_pairings = state.blocks.len() - expected_blocks;
+    let possible_pairings = 1 << remaining_depth;
+    if remaining_pairings > possible_pairings {
+        return false;
+    }
+
+    let combined_layer_mask = state
+        .blocks
+        .iter()
+        .map(|b| b.layers())
+        .fold(PackedLayers::EMPTY, |a, b| a | b);
+
+    for grip in &puzzle.grips {
+        if last_grip == Some(grip.id) {
+            continue; // same grip as last move
+        }
+        if combined_layer_mask.grip_status(grip.id) == Some(GripStatus::Inactive) {
+            continue; // doesn't move any block
+        }
+
+        for twist in grip.twists() {
+            if let Some(new_state) = state.do_twist(twist) {
+                solution.push(twist);
+                if dfs_to_solved(
+                    puzzle,
+                    new_state,
+                    solution,
+                    expected_blocks,
+                    remaining_depth - 1,
+                    Some(twist.grip),
+                ) {
+                    return true;
+                }
+                solution.pop();
             }
-            solution.pop();
         }
     }
     false

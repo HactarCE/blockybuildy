@@ -19,6 +19,7 @@ pub struct PackedLayers([u8; 2]);
 
 impl PackedLayers {
     pub const ALL: Self = Self::from_u16(0b_0111_0111_0111_0111);
+    pub const EMPTY: Self = Self::from_u16(0);
 
     const fn to_u16(self) -> u16 {
         u16::from_ne_bytes(self.0)
