@@ -20,7 +20,7 @@ pub static CUBE_ROTATIONS: [ElemId; 24] = group::stabilizer(HYPERCUBE_ROTATIONS.
     .unwrap();
 
 /// Element from the grip group.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ElemId(pub u8);
 
 impl ElemId {

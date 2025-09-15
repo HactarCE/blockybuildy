@@ -2,28 +2,114 @@ use std::fmt;
 
 use itertools::Itertools;
 
-use super::grip_set::Piece;
+use crate::StackVec;
+
+use super::grip_set::{Block, Piece};
 use super::twists::Twist;
 
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PuzzleState {
-    pub pieces: Vec<Piece>,
+    pub blocks: StackVec<Block, { crate::MAX_BLOCKS }>,
 }
 impl PuzzleState {
-    pub fn do_move(&mut self, twist: Twist) {
-        for piece in &mut self.pieces {
-            *piece = twist * *piece;
-        }
+    /// Applies a twist and returns the new state.
+    ///
+    /// Returns `None` if the twist failed because there are too many blocks to
+    /// track.
+    #[must_use]
+    pub fn do_twist(self, twist: Twist) -> Option<Self> {
+        let blocks_iter = self
+            .blocks
+            .into_iter()
+            .flat_map(|block| twist * block)
+            .sorted_unstable_by_key(|b| b.attitude());
+
+        self.from_blocks(blocks_iter)
     }
 
-    pub fn is_solved(&self) -> bool {
-        self.pieces.iter().map(|p| p.attitude).all_equal()
+    #[must_use]
+    fn from_blocks(self, blocks_iter: impl Iterator<Item = Block>) -> Option<Self> {
+        let mut ret = Self::default();
+        let mut merge_candidates = StackVec::<Block, { crate::MAX_BLOCKS }>::new();
+        for mut new_block in blocks_iter {
+            'merge_loop: loop {
+                for i in 0..merge_candidates.len() {
+                    if let Some(merged_block) = new_block.try_merge(merge_candidates[i]) {
+                        new_block = merged_block;
+                        merge_candidates = merge_candidates.swap_remove(i);
+                        continue 'merge_loop;
+                    }
+                }
+                break 'merge_loop;
+            }
+
+            if merge_candidates
+                .first()
+                .is_some_and(|m| m.attitude() != new_block.attitude())
+            {
+                ret.blocks = ret.blocks.extend(merge_candidates)?;
+                merge_candidates = StackVec::new();
+            }
+
+            merge_candidates = merge_candidates.push(new_block)?;
+        }
+
+        ret.blocks = ret.blocks.extend(merge_candidates)?;
+
+        Some(ret)
+    }
+
+    pub fn is_solved(self) -> bool {
+        self.blocks.len() == 1
+    }
+
+    #[track_caller]
+    pub fn add_piece(&mut self, piece: Piece) {
+        *self = self
+            .from_blocks(self.blocks.into_iter().chain([piece.into()]))
+            .unwrap();
     }
 }
 impl fmt::Display for PuzzleState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[")?;
-        write!(f, "{}", self.pieces.iter().join(", "))?;
+        write!(f, "{}", self.blocks.iter().join(", "))?;
         write!(f, "]")?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{StackVec, sim::*};
+
+    #[test]
+    fn test_puzzle_state() {
+        let last_layer_algs = [
+            (true, ""),
+            (false, "R"),
+            (false, "D"),
+            (true, "U"),
+            (true, "R R'"),
+            (true, "D D'"),
+            (true, "R L R' L'"),
+            (true, "F R U R' U' F'"),                    // fruruf
+            (true, "R U R' U' R' F R F'"),               // sexy sledgehammer
+            (true, "R U R' F' R U R' U' R' F R2 U' R'"), // J perm
+            (true, "R U R' U R' U' R2 U' R' U R' U R"),  // U perm
+        ];
+
+        for (should_be_solved, last_layer_twist_seq) in last_layer_algs {
+            let mut state = PuzzleState {
+                blocks: StackVec::from_iter([Block::new_solved([], [U]).unwrap()]).unwrap(),
+            };
+            for t in last_layer_twist_seq
+                .split_ascii_whitespace()
+                .map(|s| twists::TWISTS_FROM_NAME[s])
+            {
+                state = state.do_twist(t).unwrap();
+            }
+            assert_eq!(should_be_solved, state.is_solved());
+        }
     }
 }

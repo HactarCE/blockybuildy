@@ -21,19 +21,27 @@ pub const CUBE_GRIPS: [GripId; 6] = [R, L, U, D, F, B];
 
 impl fmt::Display for GripId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.char())
+        if f.alternate() {
+            write!(f, "{}", self.char().to_ascii_lowercase())
+        } else {
+            write!(f, "{}", self.char())
+        }
     }
 }
 
 impl GripId {
-    pub fn axis(self) -> usize {
+    pub const fn axis(self) -> usize {
         self.0 as usize >> 1
     }
-    pub fn signum(self) -> i8 {
+    pub const fn signum(self) -> i8 {
         if self.0 & 1 == 0 { 1 } else { -1 }
     }
 
-    pub fn char(self) -> char {
+    pub const fn opposite(self) -> Self {
+        Self(self.0 ^ 1)
+    }
+
+    pub const fn char(self) -> char {
         b"RLUDFBOI"[self.0 as usize] as char
     }
 

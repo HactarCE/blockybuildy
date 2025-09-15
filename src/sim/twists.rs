@@ -5,9 +5,15 @@ use super::elements::*;
 use super::grips::*;
 
 #[static_init::dynamic]
-static TWIST_NAMES_3D: HashMap<Twist, String> = twist_names_3d();
+pub static TWIST_NAMES_3D: HashMap<Twist, String> = twist_names_3d();
 #[static_init::dynamic]
-static TWIST_NAMES_4D: HashMap<Twist, String> = twist_names_4d();
+pub static TWIST_NAMES_4D: HashMap<Twist, String> = twist_names_4d();
+
+#[static_init::dynamic]
+pub static TWISTS_FROM_NAME: HashMap<String, Twist> =
+    itertools::chain(&*TWIST_NAMES_3D, &*TWIST_NAMES_4D)
+        .map(|(t, s)| (s.clone(), t.clone()))
+        .collect();
 
 #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Twist {

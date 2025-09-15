@@ -1,7 +1,7 @@
 use cgmath::Transform;
 use itertools::Itertools;
 
-use super::elements::{ElemId, IDENT};
+use super::elements::ElemId;
 use super::grips::{GripId, HYPERCUBE_GRIPS};
 use super::space::*;
 
