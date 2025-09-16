@@ -66,20 +66,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2261d10cca569e4643e526d8dc2e62e433cc8aba21ab764233731f8d369bf394"
 
 [[package]]
-name = "blockybuildy"
-version = "0.1.0"
-dependencies = [
- "cgmath",
- "criterion",
- "itertools 0.14.0",
- "proptest",
- "rand",
- "rand_pcg",
- "rayon",
- "static_init",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -614,6 +600,20 @@ name = "regex-syntax"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
+
+[[package]]
+name = "robodoan"
+version = "0.1.0"
+dependencies = [
+ "cgmath",
+ "criterion",
+ "itertools 0.14.0",
+ "proptest",
+ "rand",
+ "rand_pcg",
+ "rayon",
+ "static_init",
+]
 
 [[package]]
 name = "rustix"

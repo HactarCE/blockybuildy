@@ -1,11 +1,11 @@
 [package]
-name = "blockybuildy"
+name = "robodoan"
 version = "0.1.0"
 authors = ["Andrew Farkas <hellop@ajfarkas.dev>"]
 license = "MIT OR Apache-2.0"
 edition = "2024"
 rust-version = "1.89"
-repository = "https://github.com/HactarCE/blockybuildy/"
+repository = "https://github.com/HactarCE/robodoan/"
 
 [lints.rust]
 rust_2018_idioms = "warn"

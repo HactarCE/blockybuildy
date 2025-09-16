@@ -1,8 +1,8 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 
-use blockybuildy::*;
 use itertools::Itertools;
 use rand_pcg::Pcg64Mcg;
+use robodoan::*;
 
 fn exec_moves(init_state: PuzzleState, twists: &[Twist]) -> PuzzleState {
     twists
