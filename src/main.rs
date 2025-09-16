@@ -76,8 +76,8 @@ fn search_4d(scramble_str: &str) -> (usize, std::time::Duration) {
                     [right_block_grip],
                     [
                         last_layer_grip,
-                        GripId((mutually_adjacent_axes[0] << 1) as u8 | bit0),
-                        GripId((mutually_adjacent_axes[1] << 1) as u8 | bit1),
+                        GripId::new((mutually_adjacent_axes[0] << 1) as u8 | bit0),
+                        GripId::new((mutually_adjacent_axes[1] << 1) as u8 | bit1),
                     ],
                 )
                 .unwrap()

@@ -1,12 +1,10 @@
 use std::fmt;
 use std::ops::{Add, AddAssign, BitAnd, BitOr, BitXor, Mul, Not, Sub, SubAssign};
 
-use itertools::Itertools;
-
 use super::elements::{ElemId, IDENT};
 use super::grips::*;
 use super::layer_mask::PackedLayers;
-use crate::{GripStatus, Twist};
+use crate::{GripStatus, StackVec, Twist};
 
 #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct GripSet(pub u8);
@@ -14,8 +12,13 @@ impl GripSet {
     pub const NONE: GripSet = GripSet(0);
     pub const ALL: GripSet = GripSet(0xFF);
 
+    pub fn len(self) -> u32 {
+        self.0.count_ones()
+    }
+
     pub fn contains(self, grip: GripId) -> bool {
-        self.0 & (1 << grip.0) != 0
+        grip.hint_assert_in_bounds();
+        self.0 & (1 << grip.id()) != 0
     }
     pub fn iter(self) -> impl Iterator<Item = GripId> {
         HYPERCUBE_GRIPS
@@ -26,14 +29,29 @@ impl GripSet {
         self == GripSet::NONE
     }
 
+    pub fn exactly_one(self) -> Option<GripId> {
+        (self.len() == 1).then(|| self.unwrap_exactly_one())
+    }
+    pub fn exactly_two(self) -> Option<[GripId; 2]> {
+        (self.len() == 2).then(|| self.unwrap_exactly_two())
+    }
+
     #[track_caller]
     pub fn unwrap_exactly_one(self) -> GripId {
-        self.iter().exactly_one().ok().unwrap()
+        assert_eq!(1, self.len(), "expected one grip");
+        GripId::new(self.0.trailing_zeros() as u8)
+    }
+    #[track_caller]
+    pub fn unwrap_exactly_two(self) -> [GripId; 2] {
+        assert_eq!(2, self.len(), "expected two grips");
+        let first = self.0.trailing_zeros();
+        let second = (self.0 & (GripSet::ALL.0 << (first + 1))).trailing_zeros();
+        [first, second].map(|id| GripId::new(id as u8))
     }
 }
 impl FromIterator<GripId> for GripSet {
     fn from_iter<T: IntoIterator<Item = GripId>>(iter: T) -> Self {
-        Self(iter.into_iter().map(|g| 1 << g.0).sum())
+        Self(iter.into_iter().map(|g| 1 << g.id()).sum())
     }
 }
 impl fmt::Debug for GripSet {
@@ -62,7 +80,8 @@ impl Add<GripId> for GripSet {
 }
 impl AddAssign<GripId> for GripSet {
     fn add_assign(&mut self, rhs: GripId) {
-        self.0 |= 1 << rhs.0;
+        rhs.hint_assert_in_bounds();
+        self.0 |= 1 << rhs.id();
     }
 }
 impl Sub<GripId> for GripSet {
@@ -75,7 +94,8 @@ impl Sub<GripId> for GripSet {
 }
 impl SubAssign<GripId> for GripSet {
     fn sub_assign(&mut self, rhs: GripId) {
-        self.0 &= !(1 << rhs.0);
+        rhs.hint_assert_in_bounds();
+        self.0 &= !(1 << rhs.id());
     }
 }
 impl BitOr for GripSet {
@@ -304,15 +324,12 @@ mod tests {
         type Parameters = ();
 
         fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-            (
-                std::array::from_fn::<_, 8, _>(|_| 0..3),
-                (0..crate::sim::group::ELEM_COUNT as u8).prop_map(ElemId),
-            )
+            (std::array::from_fn::<_, 8, _>(|_| 0..3), any::<ElemId>())
                 .prop_filter_map("invalid block", |(grip_statuses, attitude)| {
                     let mut active_grips = GripSet::NONE;
                     let mut inactive_grips = GripSet::NONE;
                     for (i, status) in grip_statuses.into_iter().enumerate() {
-                        let g = GripId(i as u8);
+                        let g = GripId::new(i as u8);
                         if status & 1 != 0 {
                             active_grips += g;
                         }
@@ -372,6 +389,22 @@ mod tests {
 
         if let Some(m) = actual_merged {
             assert_eq!(m, possible_merged_block);
+        }
+    }
+
+    #[test]
+    fn test_grip_set_unwrap() {
+        for g1 in HYPERCUBE_GRIPS {
+            let one = GripSet::from_iter([g1]);
+            assert_eq!(one.exactly_one(), Some(g1));
+            assert_eq!(one.exactly_two(), None);
+            for g2 in HYPERCUBE_GRIPS {
+                if g1 < g2 {
+                    let two = GripSet::from_iter([g1, g2]);
+                    assert_eq!(two.exactly_one(), None);
+                    assert_eq!(two.exactly_two(), Some([g1, g2]));
+                }
+            }
         }
     }
 }

@@ -9,7 +9,7 @@ use super::space::*;
 /// Elements in the group of rotations of a hypercube.
 #[static_init::dynamic]
 pub static HYPERCUBE_ROTATIONS: [ElemId; 192] = (0..group::ELEM_COUNT)
-    .map(|i| ElemId(i as u8))
+    .map(|i| ElemId::new(i as u8))
     .collect_array()
     .unwrap();
 
@@ -21,9 +21,11 @@ pub static CUBE_ROTATIONS: [ElemId; 24] = group::stabilizer(HYPERCUBE_ROTATIONS.
 
 /// Element from the grip group.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ElemId(pub u8);
+pub struct ElemId(u8);
 
 impl ElemId {
+    pub const IDENT: Self = IDENT;
+
     /// Returns the inverse element.
     pub fn inv(self) -> ElemId {
         group::CHIRAL_BC4.inv_elem[self.0 as usize]
@@ -31,6 +33,42 @@ impl ElemId {
 
     pub fn transform<T: TransformByElem>(self, obj: T) -> T {
         obj.transform_by(self)
+    }
+
+    /// Constructs an element from an ID.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `id` is out of range (must be less [`group::ELEM_COUNT`]).
+    pub const fn new(id: u8) -> Self {
+        assert!(id < group::ELEM_COUNT as u8, "element ID out of range");
+        Self(id)
+    }
+    /// Hint to the compiler that the grip ID is within bounds.
+    #[inline]
+    pub const fn hint_assert_in_bounds(self) {
+        // SAFETY: `ElemId` is only ever constructed using `ElemId::new()`,
+        // which panics if the ID is greater than or equal to
+        // [`group::ELEM_COUNT`].
+        unsafe { std::hint::assert_unchecked(self.0 < group::ELEM_COUNT as u8) }
+    }
+
+    /// Returns the internal ID.
+    pub fn id(self) -> u8 {
+        self.0
+    }
+
+    pub fn from_id(id: u8) -> Option<Self> {
+        (id < group::ELEM_COUNT as u8).then(|| Self(id))
+    }
+
+    /// Constructs an element from `id`.
+    ///
+    /// # Safety
+    ///
+    /// `id` must be strictly less than [`group::ELEM_COUNT`].
+    pub unsafe fn from_id_unchecked(id: u8) -> Self {
+        Self(id)
     }
 }
 
@@ -58,38 +96,40 @@ impl fmt::Display for ElemId {
 }
 
 /// Identity group element.
-pub const IDENT: ElemId = ElemId(0);
+pub const IDENT: ElemId = ElemId::new(0);
 /// Rotation from +X to +Y.
-pub const XY: ElemId = ElemId(1);
+pub const XY: ElemId = ElemId::new(1);
 /// Rotation from +X to +Z.
-pub const XZ: ElemId = ElemId(2);
+pub const XZ: ElemId = ElemId::new(2);
 /// Rotation from +X to +W.
-pub const XW: ElemId = ElemId(3);
+pub const XW: ElemId = ElemId::new(3);
 
 /// Rotation from +Y to +X.
-pub const YX: ElemId = ElemId(13); // XY * XY * XY
+pub const YX: ElemId = ElemId::new(13); // XY * XY * XY
 /// Rotation from +Z to +X.
-pub const ZX: ElemId = ElemId(25); // XZ * XZ * XZ
+pub const ZX: ElemId = ElemId::new(25); // XZ * XZ * XZ
 /// Rotation from +W to +X.
-pub const WX: ElemId = ElemId(36); // XW * XW * XW
+pub const WX: ElemId = ElemId::new(36); // XW * XW * XW
 
 /// Rotation from +Y to +Z.
-pub const YZ: ElemId = ElemId(97); // XZ * YX * ZX
+pub const YZ: ElemId = ElemId::new(97); // XZ * YX * ZX
 /// Rotation from +Y to +W.
-pub const YW: ElemId = ElemId(110); // XW * YX * WX
+pub const YW: ElemId = ElemId::new(110); // XW * YX * WX
 /// Rotation from +Z to +Y.
-pub const ZY: ElemId = ElemId(84); // XY * ZX * YX
+pub const ZY: ElemId = ElemId::new(84); // XY * ZX * YX
 /// Rotation from +W to +Y.
-pub const WY: ElemId = ElemId(86); // XY * WX * YX
+pub const WY: ElemId = ElemId::new(86); // XY * WX * YX
 
 /// Rotation from +Z to +W.
-pub const ZW: ElemId = ElemId(133); // XW * ZX * WX
+pub const ZW: ElemId = ElemId::new(133); // XW * ZX * WX
 /// Rotation from +W to +Z.
-pub const WZ: ElemId = ElemId(128); // XZ * WX * ZX
+pub const WZ: ElemId = ElemId::new(128); // XZ * WX * ZX
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use proptest::prelude::*;
 
     #[test]
     fn test_simple_rotations() {
@@ -112,5 +152,15 @@ mod tests {
                 assert_eq!(elem * a, b);
             }
         }
+    }
+
+    impl Arbitrary for ElemId {
+        type Parameters = ();
+
+        fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+            (0..group::ELEM_COUNT as u8).prop_map(|id| Self::from_id(id).unwrap())
+        }
+
+        type Strategy = proptest::strategy::Map<std::ops::Range<u8>, fn(u8) -> ElemId>;
     }
 }

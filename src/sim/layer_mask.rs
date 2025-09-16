@@ -54,6 +54,7 @@ impl PackedLayers {
     }
 
     const fn bits_for_axis(self, axis: usize) -> u8 {
+        assert!(axis < 4, "axis out of range");
         ((self.to_u16() >> (axis * 4)) & 0xF) as u8
     }
     const fn is_empty_on_axis(self, axis: usize) -> bool {
@@ -62,13 +63,13 @@ impl PackedLayers {
 
     const fn bits_for_grip(self, g: GripId) -> u8 {
         let bits = self.bits_for_axis(g.axis());
-        if g.0 & 1 == 0 { bits } else { rev3(bits) }
+        if g.id() & 1 == 0 { bits } else { rev3(bits) }
     }
 
     /// Returns `[inside, outside]`
     #[must_use]
     pub fn split(self, g: GripId) -> [Option<Self>; 2] {
-        debug_assert!(g.0 < 8);
+        debug_assert!(g.id() < 8);
         [
             self.restrict_to_active_grip(g),
             self.restrict_to_inactive_grip(g),
@@ -89,8 +90,9 @@ impl PackedLayers {
         let lhs = self.to_u16();
         let rhs = other.to_u16();
         let layer_difference = lhs ^ rhs;
-        let merge_grip =
-            GripId((layer_difference & 0b_0101_0101_0101_0101).trailing_zeros() as u8 / 2);
+        let merge_grip = GripId::try_new(
+            (layer_difference & 0b_0101_0101_0101_0101).trailing_zeros() as u8 / 2,
+        )?;
         let merge_axis = layer_difference.trailing_zeros() as usize / 4;
 
         let mut lhs_bits = lhs >> (merge_axis * 4);
@@ -142,11 +144,11 @@ impl PackedLayers {
 }
 
 const fn active_grip_mask(g: GripId) -> u16 {
-    debug_assert!(g.0 < 8);
-    0b01 << (g.0 as usize * 2)
+    g.hint_assert_in_bounds();
+    0b01 << (g.id() as usize * 2)
 }
 const fn inactive_grip_mask(g: GripId) -> u16 {
-    debug_assert!(g.0 < 8);
+    g.hint_assert_in_bounds();
     (0b0111 << (g.axis() * 4)) ^ active_grip_mask(g)
 }
 
@@ -207,10 +209,10 @@ impl Mul<PackedLayers> for ElemId {
     fn mul(self, rhs: PackedLayers) -> Self::Output {
         let mut resulting_bits = 0_u16;
         for axis in 0..4 {
-            let old_grip = GripId(axis << 1);
+            let old_grip = GripId::new(axis << 1);
             let new_grip = self * old_grip;
             let old_axis_bits = rhs.bits_for_axis(axis as usize);
-            let new_axis_bits = if new_grip.0 & 1 == 0 {
+            let new_axis_bits = if new_grip.id() & 1 == 0 {
                 old_axis_bits
             } else {
                 rev3(old_axis_bits)

@@ -39,7 +39,8 @@ impl Group {
             last_unproc += 1;
         }
 
-        let elem_from_matrix = |q| ElemId(matrices.iter().position(|&m| m == q).unwrap() as u8);
+        let elem_from_matrix =
+            |q| ElemId::new(matrices.iter().position(|&m| m == q).unwrap() as u8);
 
         let mul_elem_elem: [[ElemId; 192]; 192] = matrices
             .iter()
@@ -64,7 +65,7 @@ impl Group {
                 HYPERCUBE_GRIPS
                     .iter()
                     .position(|g2| g2.vec() == mat[g.axis()] * g.signum())
-                    .map(|i| GripId(i as u8))
+                    .map(|i| GripId::new(i as u8))
                     .unwrap()
             })
         });
