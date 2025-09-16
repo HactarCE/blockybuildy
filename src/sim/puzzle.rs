@@ -2,6 +2,7 @@ use itertools::Itertools;
 use rand::seq::IndexedRandom;
 
 use super::elements::{CUBE_ROTATIONS, ElemId, HYPERCUBE_ROTATIONS};
+use super::grip_set::GripSet;
 use super::grips::{CUBE_GRIPS, GripId, HYPERCUBE_GRIPS};
 use super::twists::Twist;
 
@@ -42,6 +43,10 @@ impl Puzzle {
             .collect_vec();
 
         Self { grips, twists }
+    }
+
+    pub fn grip_set(&self) -> GripSet {
+        self.grips.iter().map(|g| g.id).collect()
     }
 
     pub fn random_moves(&self, count: usize) -> impl Iterator<Item = Twist> {

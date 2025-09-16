@@ -1,8 +1,10 @@
+use std::collections::HashSet;
 use std::fmt;
 
 use itertools::Itertools;
 
 use super::grip_set::{Block, Piece};
+use super::puzzle::Puzzle;
 use super::twists::Twist;
 use crate::StackVec;
 
@@ -25,11 +27,16 @@ impl PuzzleState {
         )?
         .sorted_unstable_by_key(|b| b.attitude());
 
-        self.from_blocks(new_blocks.into_iter())
+        Self::from_blocks(new_blocks)
     }
 
+    /// Constructs a state containing the given blocks and combines blocks as
+    /// much as possible.
+    ///
+    /// TODO: it may be possible for this to get an "N-perm situation" which
+    /// would be bad.
     #[must_use]
-    fn from_blocks(self, blocks_iter: impl Iterator<Item = Block>) -> Option<Self> {
+    fn from_blocks(blocks_iter: impl IntoIterator<Item = Block>) -> Option<Self> {
         let mut ret = Self::default();
         let mut merge_candidates = StackVec::<Block, { crate::MAX_BLOCKS }>::new();
         for mut new_block in blocks_iter {
@@ -64,11 +71,49 @@ impl PuzzleState {
         self.blocks.len() == 1
     }
 
-    #[track_caller]
-    pub fn add_piece(&mut self, piece: Piece) {
-        *self = self
-            .from_blocks(self.blocks.into_iter().chain([piece.into()]))
-            .expect("exceeded block limit. increase MAX_BLOCKS.");
+    /// Applies `setup_moves` to each piece in `block` and then adds all the
+    /// pieces into the puzzle state, except for the ones that are already in
+    /// the puzzle state.
+    ///
+    /// `block` must have the identity attitude.
+    ///
+    /// Returns `None` if the puzzle state would have more than
+    /// [`crate::MAX_BLOCKS`] blocks.
+    #[must_use]
+    pub fn add_block_with_setup_moves(
+        self,
+        puzzle: &Puzzle,
+        setup_moves: &[Twist],
+        new_block: Block,
+    ) -> Option<Self> {
+        let pieces_from_block = |block: Block| {
+            assert_eq!(block.attitude(), crate::IDENT);
+            let mut blocks = vec![block];
+            for g in (puzzle.grip_set() & block.blocked_grips()).iter() {
+                blocks = blocks
+                    .into_iter()
+                    .flat_map(|b| b.split(g))
+                    .filter_map(|b| b)
+                    .collect();
+            }
+            blocks
+                .into_iter()
+                .map(|b| Piece::new_solved(b.active_grips().iter()))
+        };
+
+        let mut new_pieces = pieces_from_block(new_block).collect::<HashSet<Piece>>();
+        for old_block in self.blocks {
+            for piece in pieces_from_block(old_block.at_solved()) {
+                new_pieces.remove(&piece);
+            }
+        }
+
+        let init_piece = |new_piece| setup_moves.iter().fold(new_piece, |p, &twist| twist * p);
+
+        Self::from_blocks(
+            self.blocks
+                .extend(new_pieces.into_iter().map(init_piece).map(Block::from))?,
+        )
     }
 }
 impl fmt::Display for PuzzleState {

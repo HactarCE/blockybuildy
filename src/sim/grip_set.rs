@@ -26,6 +26,7 @@ impl GripSet {
         self == GripSet::NONE
     }
 
+    #[track_caller]
     pub fn unwrap_exactly_one(self) -> GripId {
         self.iter().exactly_one().ok().unwrap()
     }
