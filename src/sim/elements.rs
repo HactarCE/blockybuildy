@@ -6,18 +6,34 @@ use super::group;
 use super::ops::TransformByElem;
 use super::space::*;
 
+#[static_init::dynamic]
+pub static X_STABILIZER: [ElemId; 24] = vector_stabilizer(X);
+#[static_init::dynamic]
+pub static Y_STABILIZER: [ElemId; 24] = vector_stabilizer(Y);
+#[static_init::dynamic]
+pub static Z_STABILIZER: [ElemId; 24] = vector_stabilizer(Z);
+#[static_init::dynamic]
+pub static W_STABILIZER: [ElemId; 24] = vector_stabilizer(W);
+
+#[static_init::dynamic]
+pub static XY_STABILIZER: [ElemId; 4] = plane_stabilizer(X, Y);
+#[static_init::dynamic]
+pub static XZ_STABILIZER: [ElemId; 4] = plane_stabilizer(X, Z);
+#[static_init::dynamic]
+pub static XW_STABILIZER: [ElemId; 4] = plane_stabilizer(X, W);
+#[static_init::dynamic]
+pub static YZ_STABILIZER: [ElemId; 4] = plane_stabilizer(Y, Z);
+#[static_init::dynamic]
+pub static YW_STABILIZER: [ElemId; 4] = plane_stabilizer(Y, W);
+#[static_init::dynamic]
+pub static ZW_STABILIZER: [ElemId; 4] = plane_stabilizer(Z, W);
+
 /// Elements in the group of rotations of a hypercube.
 #[static_init::dynamic]
-pub static HYPERCUBE_ROTATIONS: [ElemId; 192] = (0..group::ELEM_COUNT)
-    .map(|i| ElemId::new(i as u8))
-    .collect_array()
-    .unwrap();
-
+pub static HYPERCUBE_ROTATIONS: [ElemId; 192] = elems_iter().collect_array().unwrap();
 /// Elements in the group of rotations of a cube (as a subgroup of BC4).
 #[static_init::dynamic]
-pub static CUBE_ROTATIONS: [ElemId; 24] = group::stabilizer(HYPERCUBE_ROTATIONS.iter().copied(), W)
-    .collect_array()
-    .unwrap();
+pub static CUBE_ROTATIONS: [ElemId; 24] = *W_STABILIZER;
 
 /// Element from the grip group.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -124,6 +140,19 @@ pub const WY: ElemId = ElemId::new(86); // XY * WX * YX
 pub const ZW: ElemId = ElemId::new(133); // XW * ZX * WX
 /// Rotation from +W to +Z.
 pub const WZ: ElemId = ElemId::new(128); // XZ * WX * ZX
+
+fn elems_iter() -> impl Iterator<Item = ElemId> {
+    (0..group::ELEM_COUNT).map(|i| ElemId::new(i as u8))
+}
+
+fn vector_stabilizer(v: Vec4) -> [ElemId; 24] {
+    group::stabilizer(elems_iter(), v).collect_array().unwrap()
+}
+fn plane_stabilizer(v1: Vec4, v2: Vec4) -> [ElemId; 4] {
+    group::stabilizer(vector_stabilizer(v1), v2)
+        .collect_array()
+        .unwrap()
+}
 
 #[cfg(test)]
 mod tests {

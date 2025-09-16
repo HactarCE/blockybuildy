@@ -1,10 +1,7 @@
-use std::hint::black_box;
-
 use criterion::{Criterion, criterion_group, criterion_main};
 
 use blockybuildy::*;
 use itertools::Itertools;
-use rand::seq::{IndexedRandom, SliceRandom};
 use rand_pcg::Pcg64Mcg;
 
 fn exec_moves(init_state: PuzzleState, twists: &[Twist]) -> PuzzleState {

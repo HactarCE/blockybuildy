@@ -61,11 +61,17 @@ impl Mul<Piece> for ElemId {
     }
 }
 
+impl TransformByElem for ElemId {
+    fn transform_by(self, elem: ElemId) -> Self {
+        elem * self * elem.inv()
+    }
+}
+
 impl TransformByElem for Twist {
     fn transform_by(self, elem: ElemId) -> Self {
         Twist {
             grip: elem * self.grip,
-            transform: elem * self.transform * elem.inv(),
+            transform: elem.transform(self.transform),
         }
     }
 }

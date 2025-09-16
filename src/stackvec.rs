@@ -18,7 +18,7 @@ impl<T: fmt::Debug, const CAP: usize> fmt::Debug for StackVec<T, CAP> {
 
 impl<T: Default + Copy, const CAP: usize> Default for StackVec<T, CAP> {
     fn default() -> Self {
-        assert!(CAP <= u8::MAX as usize, "capacity too big");
+        assert!(CAP <= u8::MAX as usize, "capacity too big"); // somehow this encourages optimizations
         Self {
             len: 0,
             elems: [T::default(); CAP],
@@ -29,6 +29,18 @@ impl<T: Default + Copy, const CAP: usize> Default for StackVec<T, CAP> {
 impl<T: Default + Copy, const CAP: usize> StackVec<T, CAP> {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn from_slice(array: &[T]) -> Option<Self> {
+        let mut ret = Self::default();
+        if array.len() > CAP {
+            return None; // doesn't fit
+        }
+        ret.elems[..array.len()].copy_from_slice(array);
+        ret.len = array.len() as u8;
+        Some(ret)
     }
 
     #[must_use]

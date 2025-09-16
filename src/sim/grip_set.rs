@@ -183,10 +183,10 @@ impl Block {
     ) -> Option<Self> {
         let mut layers = PackedLayers::ALL;
         for g in active_grips {
-            layers = layers.restrict_to_active_grip(g);
+            layers = layers.restrict_to_active_grip(g)?;
         }
         for g in inactive_grips {
-            layers = layers.restrict_to_inactive_grip(g);
+            layers = layers.restrict_to_inactive_grip(g)?;
         }
         if layers.is_empty_on_any_axis() {
             return None; // block is empty!
@@ -242,14 +242,14 @@ impl Block {
     #[must_use]
     pub fn restrict_to_active_grip(self, grip: GripId) -> Option<Self> {
         Some(Self {
-            layers: self.layers.restrict_to_active_grip(grip),
+            layers: self.layers.restrict_to_active_grip(grip)?,
             attitude: self.attitude,
         })
     }
     #[must_use]
     pub fn restrict_to_inactive_grip(self, grip: GripId) -> Option<Self> {
         Some(Self {
-            layers: self.layers.restrict_to_inactive_grip(grip),
+            layers: self.layers.restrict_to_inactive_grip(grip)?,
             attitude: self.attitude,
         })
     }
@@ -263,6 +263,26 @@ impl Block {
             };
             self.layers.grip_status(g) != Some(forbidden_status)
         })
+    }
+
+    /// Returns a list of indistinguishable attitudes for the block in its
+    /// current position, or `None` if the attitude is completely
+    /// distinguishable.
+    ///
+    /// - In 3D, only centers have indistinguishable attitudes.
+    /// - In 4D, only centers and ridges has indistinguishable attitudes.
+    ///
+    /// The core's attitude is always completely distinguishable.
+    #[must_use]
+    pub fn indistinguishable_attitudes(self, ndim: usize) -> Option<StackVec<ElemId, 24>> {
+        const CORE_3D: PackedLayers = PackedLayers::CORE_3D;
+
+        if ndim == 3 && self.layers == CORE_3D {
+            return None; // 3D core is distinguishable
+        }
+        self.layers
+            .indistinguishable_subgroup()
+            .map(|subgroup| subgroup.map(|rot| rot * self.attitude))
     }
 
     //// Returns `[inside, outside]`
@@ -403,6 +423,65 @@ mod tests {
                     let two = GripSet::from_iter([g1, g2]);
                     assert_eq!(two.exactly_one(), None);
                     assert_eq!(two.exactly_two(), Some([g1, g2]));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_block_indistinguishable_attitudes() {
+        fn count(b: Block, ndim: usize) -> usize {
+            match b.indistinguishable_attitudes(ndim) {
+                Some(subgroup) => subgroup.len(),
+                None => 1,
+            }
+        }
+
+        // 4D
+        for ((ndim, grips, rotations), (center_orientations, ridge_orientations)) in [
+            (
+                (3, CUBE_GRIPS.as_slice(), crate::CUBE_ROTATIONS.as_slice()),
+                (4, 1),
+            ),
+            ((4, &HYPERCUBE_GRIPS, &*crate::HYPERCUBE_ROTATIONS), (24, 4)),
+        ] {
+            for &elem in rotations {
+                let core = Block::new([], grips.iter().copied(), elem).unwrap();
+                assert_eq!(1, count(core, ndim)); // core
+
+                for &g1 in grips {
+                    let b1 = core.expand_to_active_grip(g1);
+                    let cases = [
+                        b1,
+                        b1.restrict_to_active_grip(g1).unwrap(),
+                        b1.expand_to_active_grip(g1.opposite()),
+                    ];
+                    for case in cases {
+                        assert_eq!(center_orientations, count(case, ndim));
+                    }
+                    for &g2 in grips.into_iter().filter(|&g2| g2.axis() != g1.axis()) {
+                        let blocked = cases.map(|b| b.expand_to_active_grip(g2));
+                        let active = blocked.map(|b| b.restrict_to_active_grip(g2).unwrap());
+                        let double_blocked =
+                            blocked.map(|b| b.expand_to_active_grip(g2.opposite()));
+                        let cases = [blocked, active, double_blocked];
+                        for &case in cases.as_flattened() {
+                            assert_eq!(ridge_orientations, count(case, ndim));
+                        }
+                        for &g3 in grips
+                            .into_iter()
+                            .filter(|&g3| g3.axis() != g1.axis() && g3.axis() != g2.axis())
+                        {
+                            for b in cases.as_flattened() {
+                                let blocked = b.expand_to_active_grip(g3);
+                                let active = blocked.restrict_to_active_grip(g3).unwrap();
+                                let double_blocked = blocked.expand_to_active_grip(g3.opposite());
+                                for case in [blocked, active, double_blocked] {
+                                    assert_eq!(1, count(case, ndim));
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

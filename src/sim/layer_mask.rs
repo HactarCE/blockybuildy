@@ -1,7 +1,10 @@
 use std::fmt;
 use std::ops::{BitAnd, BitOr, BitXor, Mul};
 
+use crate::StackVec;
+
 use super::elements::ElemId;
+use super::elements::*;
 use super::grip_set::GripSet;
 use super::grips::*;
 
@@ -18,8 +21,10 @@ pub enum GripStatus {
 pub struct PackedLayers([u8; 2]);
 
 impl PackedLayers {
-    pub const ALL: Self = Self::from_u16(0b_0111_0111_0111_0111);
     pub const EMPTY: Self = Self::from_u16(0);
+    pub const CORE_3D: Self = Self::from_u16(0b_0111_0010_0010_0010);
+    pub const CORE_4D: Self = Self::from_u16(0b_0010_0010_0010_0010);
+    pub const ALL: Self = Self::from_u16(0b_0111_0111_0111_0111);
 
     const fn to_u16(self) -> u16 {
         u16::from_ne_bytes(self.0)
@@ -29,52 +34,93 @@ impl PackedLayers {
     }
 
     #[must_use]
-    pub const fn restrict_to_active_grip(self, g: GripId) -> Self {
-        Self::from_u16(self.to_u16() & !inactive_grip_mask(g))
+    pub const fn restrict_to_active_grip(self, g: GripId) -> Option<Self> {
+        Self::from_u16(self.to_u16() & !inactive_grip_mask(g)).if_nonempty_on_axis(g.axis())
     }
     #[must_use]
-    pub const fn restrict_to_inactive_grip(self, g: GripId) -> Self {
-        Self::from_u16(self.to_u16() & !active_grip_mask(g))
+    pub const fn restrict_to_inactive_grip(self, g: GripId) -> Option<Self> {
+        Self::from_u16(self.to_u16() & !active_grip_mask(g)).if_nonempty_on_axis(g.axis())
     }
     #[must_use]
-    pub fn expand_to_active_grip(self, g: GripId) -> Self {
+    pub const fn expand_to_active_grip(self, g: GripId) -> Self {
         Self::from_u16(
             self.to_u16()
-                | if self.grip_status(g.opposite()) == Some(GripStatus::Active) {
-                    inactive_grip_mask(g.opposite())
-                } else {
-                    active_grip_mask(g)
+                | match self.grip_status(g.opposite()) {
+                    Some(GripStatus::Active) => inactive_grip_mask(g.opposite()),
+                    _ => active_grip_mask(g),
                 },
         )
     }
 
-    pub fn is_empty_on_any_axis(self) -> bool {
+    #[inline]
+    const fn if_nonempty_on_axis(self, axis: usize) -> Option<Self> {
+        if self.is_empty_on_axis(axis) {
+            None
+        } else {
+            Some(self)
+        }
+    }
+    pub const fn is_empty_on_any_axis(self) -> bool {
         let bits = self.to_u16();
         (bits | (bits >> 1) | (bits >> 2)) & 0b_0001_0001_0001_0001 != 0b_0001_0001_0001_0001
     }
 
+    #[inline]
     const fn bits_for_axis(self, axis: usize) -> u8 {
         assert!(axis < 4, "axis out of range");
-        ((self.to_u16() >> (axis * 4)) & 0xF) as u8
+        ((self.to_u16() >> (axis * 4)) & 0b111) as u8
     }
+    #[inline]
     const fn is_empty_on_axis(self, axis: usize) -> bool {
         self.bits_for_axis(axis) == 0
     }
+    #[inline]
+    pub const fn is_axis_blocked(self, axis: usize) -> bool {
+        self.bits_for_axis(axis) & 0b101 != 0
+    }
 
+    #[inline]
     const fn bits_for_grip(self, g: GripId) -> u8 {
         let bits = self.bits_for_axis(g.axis());
         if g.id() & 1 == 0 { bits } else { rev3(bits) }
     }
 
+    pub fn indistinguishable_subgroup(self) -> Option<StackVec<ElemId, 24>> {
+        let blocked_axes_mask = {
+            self.is_axis_blocked(0) as u8
+                | (self.is_axis_blocked(1) as u8) << 1
+                | (self.is_axis_blocked(2) as u8) << 2
+                | (self.is_axis_blocked(3) as u8) << 3
+        };
+        if blocked_axes_mask.count_ones() == 1 {
+            StackVec::from_slice(&match blocked_axes_mask {
+                0b0001 => *X_STABILIZER,
+                0b0010 => *Y_STABILIZER,
+                0b0100 => *Z_STABILIZER,
+                0b1000 => *W_STABILIZER,
+                _ => return None,
+            })
+        } else if blocked_axes_mask.count_ones() == 2 {
+            StackVec::from_slice(&match blocked_axes_mask {
+                0b0011 => *XY_STABILIZER,
+                0b0101 => *XZ_STABILIZER,
+                0b1001 => *XW_STABILIZER,
+                0b0110 => *YZ_STABILIZER,
+                0b1010 => *YW_STABILIZER,
+                0b1100 => *ZW_STABILIZER,
+                _ => return None,
+            })
+        } else {
+            None
+        }
+    }
     /// Returns `[inside, outside]`
     #[must_use]
     pub fn split(self, g: GripId) -> [Option<Self>; 2] {
-        debug_assert!(g.id() < 8);
         [
             self.restrict_to_active_grip(g),
             self.restrict_to_inactive_grip(g),
         ]
-        .map(|l| (!l.is_empty_on_axis(g.axis())).then_some(l))
     }
 
     pub fn is_subset_of(self, other: Self) -> bool {
