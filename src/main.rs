@@ -1,22 +1,7 @@
 use std::collections::HashSet;
 
+use blockybuildy::*;
 use itertools::Itertools;
-
-pub mod search;
-pub mod sim;
-pub mod stackvec;
-
-pub use sim::*;
-pub use stackvec::StackVec;
-
-pub use crate::search::*;
-
-pub const IS_3D: bool = false;
-pub const USE_3D_TWIST_NAMES: bool = IS_3D;
-
-// pub const MAX_BLOCKS: usize = 10;
-pub const MAX_BLOCKS: usize = 31;
-// bigger number is sometimes better???
 
 fn main() {
     // let scramble = scramble_3d();
@@ -30,23 +15,23 @@ fn main() {
     // search_3d(&scramble, max_depth, 1);
     // search_3d(&scramble, max_depth, 2);
 
-    let mut results = vec![];
-    for i in 0..10 {
-        let scramble = scramble_4d();
-        println!("\n\n---- STARTING SEARCH #{} ----\n", i + 1);
-        results.push(search_4d(&scramble));
-    }
-    println!("\n\n---- RESULTS ----\n");
-    for (move_count, time) in results {
-        println!("{move_count} ETM in {time:?}");
-    }
+    // let mut results = vec![];
+    // for i in 0..10 {
+    //     let scramble = scramble_4d();
+    //     println!("\n\n---- STARTING SEARCH #{} ----\n", i + 1);
+    //     results.push(search_4d(&scramble));
+    // }
+    // println!("\n\n---- RESULTS ----\n");
+    // for (move_count, time) in results {
+    //     println!("{move_count} ETM in {time:?}");
+    // }
 
     // let scramble = scramble_4d();
-    // // let scramble = "LF IB2 IDFR LF RBI ID ODFL BUO IBL BR2 OUF BLO IDFL OB FI LD RU2 DFLI FUO IU2 OUBR BD IDFL OUB LDFO BDO FUL IR IUL OL2 LDBI FL BL IU LI2 ODFR OB2 OUF DFLI RI LO RF RB LD IDBL UBRO LDFI FULI FI2 OUF ODFL UFRI LU DL FU LDBO DFRI OB LD UI FLI FO IF IFL DFLI LD FD DBO RUBI DO FD IDFL UBI LUBI BURO BDRI BU BD2 RDBI UBL DB2 LO LDBO OL2 RF BDO ULI UFLO BR2 LB IL DFRI DFR FUI ULI FL IU UBRI LO BURI";
-    // println!("Scramble: {scramble}");
-    // println!();
+    let scramble = "LF IB2 IDFR LF RBI ID ODFL BUO IBL BR2 OUF BLO IDFL OB FI LD RU2 DFLI FUO IU2 OUBR BD IDFL OUB LDFO BDO FUL IR IUL OL2 LDBI FL BL IU LI2 ODFR OB2 OUF DFLI RI LO RF RB LD IDBL UBRO LDFI FULI FI2 OUF ODFL UFRI LU DL FU LDBO DFRI OB LD UI FLI FO IF IFL DFLI LD FD DBO RUBI DO FD IDFL UBI LUBI BURO BDRI BU BD2 RDBI UBL DB2 LO LDBO OL2 RF BDO ULI UFLO BR2 LB IL DFRI DFR FUI ULI FL IU UBRI LO BURI";
+    println!("Scramble: {scramble}");
+    println!();
     // // let scramble = "IDFL LF UBI IUB IL2 RUBO IUBR DO DLO IUBL UI2 ID FULI LUBO OUF DFRI DL BULO FLI LUBI FR BLO UBO UBRO OUFL IU RFI BR2 RI ID IB2 OUBL RUBO DFLO DFRO BO BDL UFRO OUFL ID BURO IBL OUL BD IBL DBLI FDLO BUO DBLO FLO LDF BRO ID FLI IUF OL OL OBL ULO BUO FURI UL2 BR FDLO IUBL UBLO IBL BR2 IUBL BURO IU2 DF ODBL LDBO BR RUB LUBI IU2 FURI IUL OUL ODBR OL2 IB DL UB BO OUB FL2 DFRO ODBR UFRI RI RUFI RDBO IUR UBO BUL RDFI LUFO";
-    // search_4d(&scramble).unwrap();
+    dbg!(search_4d(&scramble));
 }
 
 fn search_4d(scramble_str: &str) -> (usize, std::time::Duration) {
@@ -58,7 +43,7 @@ fn search_4d(scramble_str: &str) -> (usize, std::time::Duration) {
             heuristic: Heuristic::Fast,
             max_depth: 4,
             parallel_depth: 2,
-            force_parallel_determinism: false,
+            force_parallel_determinism: true,
             trim: 0,
             verbosity: 1,
         },
@@ -148,11 +133,17 @@ fn search_4d(scramble_str: &str) -> (usize, std::time::Duration) {
 }
 
 fn scramble_3d() -> String {
-    RUBIKS_3D.random_moves(100).map(|t| t.to_string()).join(" ")
+    RUBIKS_3D
+        .random_moves(&mut rand::rng(), 100)
+        .map(|t| t.to_string())
+        .join(" ")
 }
 
 fn scramble_4d() -> String {
-    RUBIKS_4D.random_moves(100).map(|t| t.to_string()).join(" ")
+    RUBIKS_4D
+        .random_moves(&mut rand::rng(), 100)
+        .map(|t| t.to_string())
+        .join(" ")
 }
 
 // fn search_3d(scramble: &str, max_depth: usize, trim: usize) {
