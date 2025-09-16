@@ -1,17 +1,18 @@
 use std::fmt;
 use std::ops::{Add, AddAssign, BitAnd, BitOr, BitXor, Mul, Not, Sub, SubAssign};
 
-use crate::{GripStatus, StackVec, Twist};
+use itertools::Itertools;
 
 use super::elements::{ElemId, IDENT};
 use super::grips::*;
 use super::layer_mask::PackedLayers;
+use crate::{GripStatus, Twist};
 
 #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct GripSet(pub u8);
 impl GripSet {
-    pub const CORE: GripSet = GripSet(0);
-    pub const ANTICORE: GripSet = GripSet(0xFF);
+    pub const NONE: GripSet = GripSet(0);
+    pub const ALL: GripSet = GripSet(0xFF);
 
     pub fn contains(self, grip: GripId) -> bool {
         self.0 & (1 << grip.0) != 0
@@ -21,8 +22,12 @@ impl GripSet {
             .into_iter()
             .filter(move |&g| self.contains(g))
     }
-    pub fn is_core(self) -> bool {
-        self == GripSet::CORE
+    pub fn is_empty(self) -> bool {
+        self == GripSet::NONE
+    }
+
+    pub fn unwrap_exactly_one(self) -> GripId {
+        self.iter().exactly_one().ok().unwrap()
     }
 }
 impl FromIterator<GripId> for GripSet {
@@ -40,7 +45,7 @@ impl fmt::Display for GripSet {
         for g in self.iter() {
             g.fmt(f)?;
         }
-        if self.is_core() {
+        if self.is_empty() {
             write!(f, "∅")?;
         }
         Ok(())
@@ -175,6 +180,13 @@ impl Block {
         self.attitude
     }
 
+    pub fn at_solved(self) -> Self {
+        Block {
+            layers: self.attitude.inv() * self.layers,
+            attitude: IDENT,
+        }
+    }
+
     pub fn is_subset_of(self, other: Self) -> bool {
         self.attitude == other.attitude && self.layers.is_subset_of(other.layers)
     }
@@ -206,6 +218,20 @@ impl Block {
             attitude: self.attitude,
         }
     }
+    #[must_use]
+    pub fn restrict_to_active_grip(self, grip: GripId) -> Option<Self> {
+        Some(Self {
+            layers: self.layers.restrict_to_active_grip(grip),
+            attitude: self.attitude,
+        })
+    }
+    #[must_use]
+    pub fn restrict_to_inactive_grip(self, grip: GripId) -> Option<Self> {
+        Some(Self {
+            layers: self.layers.restrict_to_inactive_grip(grip),
+            attitude: self.attitude,
+        })
+    }
 
     pub fn contains_piece(self, piece: Piece) -> bool {
         HYPERCUBE_GRIPS.into_iter().all(|g| {
@@ -234,7 +260,7 @@ impl Block {
         }
 
         Some(Self {
-            layers: self.layers.merge_blocks(other.layers)?,
+            layers: self.layers.try_merge_with(other.layers)?.0,
             attitude: self.attitude,
         })
     }
@@ -282,8 +308,8 @@ mod tests {
                 (0..crate::sim::group::ELEM_COUNT as u8).prop_map(ElemId),
             )
                 .prop_filter_map("invalid block", |(grip_statuses, attitude)| {
-                    let mut active_grips = GripSet::CORE;
-                    let mut inactive_grips = GripSet::CORE;
+                    let mut active_grips = GripSet::NONE;
+                    let mut inactive_grips = GripSet::NONE;
                     for (i, status) in grip_statuses.into_iter().enumerate() {
                         let g = GripId(i as u8);
                         if status & 1 != 0 {

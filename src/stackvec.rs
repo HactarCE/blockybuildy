@@ -1,8 +1,6 @@
-use std::{
-    cmp::Ordering,
-    fmt,
-    ops::{Deref, DerefMut, Index, IndexMut},
-};
+use std::cmp::Ordering;
+use std::fmt;
+use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 #[repr(align(8))]
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -61,14 +59,6 @@ impl<T: Default + Copy, const CAP: usize> StackVec<T, CAP> {
     }
 
     #[must_use]
-    pub fn flat_map<U: Default + Copy, const CAP2: usize, I: IntoIterator<Item = U>>(
-        self,
-        f: impl FnMut(T) -> I,
-    ) -> Option<StackVec<U, CAP2>> {
-        StackVec::from_iter(self.into_iter().flat_map(f))
-    }
-
-    #[must_use]
     pub fn extend(mut self, iter: impl IntoIterator<Item = T>) -> Option<Self> {
         let iter = iter.into_iter();
 
@@ -91,42 +81,6 @@ impl<T: Default + Copy, const CAP: usize> StackVec<T, CAP> {
     pub fn swap_remove(mut self, index: usize) -> Self {
         self[index] = self[self.len() - 1];
         self.len -= 1;
-        self
-    }
-
-    /// Attempts to merge pairs of adjacent elements.
-    pub fn merge_adjacent_with(mut self, mut merge_fn: impl FnMut(T, T) -> Option<T>) -> Self {
-        let mut i = 0;
-        let mut j = 1;
-        while j < self.len() {
-            if let Some(merged) = merge_fn(self[i], self[j]) {
-                self[i] = merged;
-            } else {
-                i += 1;
-                if i < j {
-                    self[i] = self[j];
-                }
-            }
-            j += 1;
-        }
-        self
-    }
-
-    /// Attempts to merge each unordered pair of elements.
-    #[must_use]
-    pub fn try_merge(mut self, mut merge_fn: impl FnMut(T, T) -> Option<T>) -> Self {
-        let mut i = 0;
-        while i < self.len() {
-            let mut j = i + 1;
-            while j < self.len() {
-                if let Some(result) = merge_fn(self[i], self[j]) {
-                    self[i] = result;
-                    self = self.swap_remove(j);
-                }
-                j += 1;
-            }
-            i += 1;
-        }
         self
     }
 }

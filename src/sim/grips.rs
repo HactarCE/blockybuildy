@@ -56,4 +56,8 @@ impl GripId {
             .filter(|&e| e != IDENT)
             .collect()
     }
+
+    pub fn can_transform_grip_to_grip(self, start: GripId, end: GripId) -> bool {
+        self.axis() != start.axis() && self.axis() != end.axis()
+    }
 }

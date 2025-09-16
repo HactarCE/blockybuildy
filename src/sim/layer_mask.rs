@@ -81,7 +81,7 @@ impl PackedLayers {
     }
 
     #[must_use]
-    pub fn merge_blocks(self, other: Self) -> Option<Self> {
+    pub fn try_merge_with(self, other: Self) -> Option<(Self, GripId)> {
         if self == other {
             return None; // same blocks
         }
@@ -89,6 +89,8 @@ impl PackedLayers {
         let lhs = self.to_u16();
         let rhs = other.to_u16();
         let layer_difference = lhs ^ rhs;
+        let merge_grip =
+            GripId((layer_difference & 0b_0101_0101_0101_0101).trailing_zeros() as u8 / 2);
         let merge_axis = layer_difference.trailing_zeros() as usize / 4;
 
         let mut lhs_bits = lhs >> (merge_axis * 4);
@@ -107,7 +109,19 @@ impl PackedLayers {
             return None; // disconnected blocks not allowed (but they could be, if we had slice moves)
         }
 
-        Some(self | other)
+        Some((self | other, merge_grip))
+    }
+
+    /// Returns the positive grips on the separating axes of the blocks.
+    pub fn separating_axes(self, other: Self) -> GripSet {
+        let diff = self ^ other;
+        let mut ret = GripSet::NONE;
+        for g in [R, U, F, O] {
+            if diff.bits_for_grip(g) & 0b111 != 0 {
+                ret += g;
+            }
+        }
+        ret
     }
 
     /// Returns the status of a grip, or `None` if the layer mask is invalid.
@@ -148,9 +162,9 @@ impl fmt::Debug for PackedLayers {
 }
 impl fmt::Display for PackedLayers {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut active = GripSet::CORE;
-        let mut blocked = GripSet::CORE;
-        let mut inactive = GripSet::CORE;
+        let mut active = GripSet::NONE;
+        let mut blocked = GripSet::NONE;
+        let mut inactive = GripSet::NONE;
         for g in HYPERCUBE_GRIPS {
             match self.grip_status(g) {
                 Some(GripStatus::Active) => active += g,
@@ -215,9 +229,8 @@ const fn rev3(x: u8) -> u8 {
 
 #[cfg(test)]
 mod tests {
-    use crate::{HYPERCUBE_ROTATIONS, IDENT};
-
     use super::*;
+    use crate::{HYPERCUBE_ROTATIONS, IDENT};
 
     #[test]
     fn test_transform_layer_mask() {
