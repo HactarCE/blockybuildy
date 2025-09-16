@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use rand::seq::IndexedRandom;
+use rayon::prelude::*;
 
 use super::elements::{CUBE_ROTATIONS, ElemId, HYPERCUBE_ROTATIONS};
 use super::grip_set::GripSet;
@@ -65,6 +66,12 @@ impl GripData {
         let grip = self.id;
         self.transforms
             .iter()
+            .map(move |&transform| Twist { grip, transform })
+    }
+    pub fn par_twists(&self) -> impl ParallelIterator<Item = Twist> {
+        let grip = self.id;
+        self.transforms
+            .par_iter()
             .map(move |&transform| Twist { grip, transform })
     }
 }

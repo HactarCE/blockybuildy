@@ -1,3 +1,5 @@
+use rayon::prelude::*;
+
 use super::*;
 
 /// Runs iterative-deepening depth-first searches repeatedly via
@@ -26,37 +28,23 @@ pub fn blockbuild_via_repeated_iddfs(
             );
         }
 
-        'deepen_loop: loop {
-            if let Some(additional_twist_count) =
-                (target_blocks..state.blocks.len()).find_map(|expected_blocks| {
-                    iddfs_blockbuild(
-                        puzzle,
-                        state,
-                        solution,
-                        params,
-                        expected_blocks,
-                        current_max_depth,
-                    )
-                })
-            {
-                // Reset max depth.
-                current_max_depth = params.max_depth;
-                solution_segments
-                    .push(solution[solution.len() - additional_twist_count..].to_vec());
-                break 'deepen_loop;
-            } else if params.deepen_when_stuck {
-                if params.verbosity >= 2 {
-                    println!(
-                        "  Stuck at {} blocks; increasing depth tempoarily. Partial solution: {}",
-                        state.blocks.len(),
-                        solution.iter().join(" "),
-                    );
-                }
-                current_max_depth += 1;
-                continue 'deepen_loop; // can't even get 1 block within reasonable depth
-            } else {
-                return None; // give up
-            }
+        if let Some(additional_twist_count) =
+            (target_blocks..state.blocks.len()).find_map(|expected_blocks| {
+                iddfs_blockbuild(
+                    puzzle,
+                    state,
+                    solution,
+                    params,
+                    expected_blocks,
+                    current_max_depth,
+                )
+            })
+        {
+            // Reset max depth.
+            current_max_depth = params.max_depth;
+            solution_segments.push(solution[solution.len() - additional_twist_count..].to_vec());
+        } else {
+            return None; // give up
         }
     }
 
@@ -94,6 +82,7 @@ pub fn iddfs_blockbuild(
             params,
             expected_blocks,
             depth,
+            params.parallel_depth,
             None,
         );
         if let Some(mut additional_twist_count) = dfs_result {
@@ -141,6 +130,7 @@ pub fn dfs_blockbuild(
     params: BlockBuildingSearchParams,
     expected_blocks: usize,
     remaining_depth: usize,
+    remaining_parallel_depth: usize,
     last_grip: Option<GripId>,
 ) -> Option<usize> {
     if state.blocks.len() <= expected_blocks {
@@ -163,31 +153,68 @@ pub fn dfs_blockbuild(
         .map(|b| b.layers())
         .fold(PackedLayers::EMPTY, |a, b| a | b);
 
-    for grip in &puzzle.grips {
+    let grip_is_worth_testing = |grip: &&GripData| {
         if last_grip == Some(grip.id) {
-            continue; // same grip as last move
+            return false; // same grip as last move
         }
         if combined_layer_mask.grip_status(grip.id) == Some(GripStatus::Inactive) {
-            continue; // doesn't move any block
+            return false; // doesn't move any block
         }
+        true
+    };
 
-        for twist in grip.twists() {
-            if let Some(mut new_state) = state.do_twist(twist) {
-                solution.push(twist);
-                let dfs_result = dfs_blockbuild(
-                    puzzle,
-                    &mut new_state,
-                    solution,
-                    params,
-                    expected_blocks,
-                    remaining_depth - 1,
-                    Some(twist.grip),
-                );
-                if let Some(additional_twist_count) = dfs_result {
-                    *state = new_state;
-                    return Some(additional_twist_count + 1);
+    let eval_twist = |twist: Twist, state: &mut PuzzleState, solution: &mut Vec<Twist>| {
+        // execute a twist and return the search result from its subtree if successful
+        if let Some(mut new_state) = state.do_twist(twist) {
+            solution.push(twist);
+            let dfs_result = dfs_blockbuild(
+                puzzle,
+                &mut new_state,
+                solution,
+                params,
+                expected_blocks,
+                remaining_depth - 1,
+                remaining_parallel_depth.saturating_sub(1),
+                Some(twist.grip),
+            );
+            if let Some(additional_twist_count) = dfs_result {
+                *state = new_state;
+                return Some(additional_twist_count + 1);
+            }
+            solution.pop();
+        }
+        None
+    };
+
+    if remaining_parallel_depth > 0 {
+        // parallel
+        let parallel_candidates = puzzle
+            .grips
+            .par_iter()
+            .filter(grip_is_worth_testing)
+            .flat_map(|grip| grip.par_twists());
+        let predicate = |twist| {
+            let mut new_state = *state;
+            let mut additional_solution = vec![];
+            eval_twist(twist, &mut new_state, &mut additional_solution)
+                .map(|ret| (ret, new_state, additional_solution))
+        };
+        let parallel_search_result = match params.force_parallel_determinism {
+            true => parallel_candidates.find_map_first(predicate),
+            false => parallel_candidates.find_map_any(predicate),
+        };
+        if let Some((success, new_state, additional_solution)) = parallel_search_result {
+            *state = new_state;
+            solution.extend(additional_solution);
+            return Some(success);
+        }
+    } else {
+        // sequential
+        for grip in puzzle.grips.iter().filter(grip_is_worth_testing) {
+            for twist in grip.twists() {
+                if let Some(success) = eval_twist(twist, state, solution) {
+                    return Some(success);
                 }
-                solution.pop();
             }
         }
     }

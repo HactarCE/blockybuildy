@@ -8,16 +8,17 @@ pub struct BlockBuildingSearchParams {
 
     /// Maximum depth for IDDFS.
     pub max_depth: usize,
-    /// Increase the IDDFS depth if a block cannot be formed in `max_depth`
-    /// moves.
+
+    /// Depth into the DFS to parallelize.
+    pub parallel_depth: usize,
+    /// Setting this option to `true` will enforce determinism in parallel
+    /// searches.
     ///
-    /// When this flag is false, the search is aborted if a block cannot be
-    /// formed in `max_depth` moves.
-    ///
-    /// This is recommended when there are very few candidate blocks. If there
-    /// are many candidate blocks, then settings this to true will cause the
-    /// search to wait until every candidate has a solution.
-    pub deepen_when_stuck: bool,
+    /// When `parallel_depth` is a nonzero value, this controls whether the
+    /// search will be terminated as soon as any of the parallel searches
+    /// succeeds (faster, nondeterministic) or as soon as the sequentially-first
+    /// parallel search succeeds (slower, deterministic).
+    pub force_parallel_determinism: bool,
 
     /// Number of moves to trim off the end of the solution in case they cancel
     /// nicely with the next phase.
@@ -32,7 +33,8 @@ impl Default for BlockBuildingSearchParams {
         Self {
             heuristic: Heuristic::Fast,
             max_depth: 3,
-            deepen_when_stuck: false,
+            parallel_depth: 2,
+            force_parallel_determinism: true,
             trim: 0,
             verbosity: 1,
         }

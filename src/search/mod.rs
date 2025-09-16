@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::prelude::*;
 
 mod dfs;
 mod heuristic;
@@ -66,7 +66,7 @@ impl BlockBuildingSearch {
         block_name: &str,
         expected_blocks: usize,
         candidate_blocks: &[Block],
-    ) -> Result<Block, String> {
+    ) -> Block {
         let t = std::time::Instant::now();
 
         println!(
@@ -76,7 +76,7 @@ impl BlockBuildingSearch {
 
         let setup_moves = self.all_moves();
 
-        let (new_solved_block, new_state, new_solution, new_segments) = candidate_blocks
+        let parallel_search_result = candidate_blocks
             .into_par_iter()
             .filter_map(|&new_block| {
                 let mut solution = self.solution.clone();
@@ -100,25 +100,43 @@ impl BlockBuildingSearch {
                     }
                 }
             })
-            .min_by_key(|(_, _, solution, _)| solution.len())
-            .ok_or_else(|| format!("no solution to {block_name} block"))?;
+            .min_by_key(|(_, _, solution, _)| solution.len());
 
-        let additional_twist_count: usize = new_segments.iter().map(|segment| segment.len()).sum();
+        match parallel_search_result {
+            Some((new_solved_block, new_state, new_solution, new_segments)) => {
+                let additional_twist_count: usize =
+                    new_segments.iter().map(|segment| segment.len()).sum();
 
-        // Update state solution
-        self.state = new_state;
-        self.solution = new_solution;
+                // Update state solution
+                self.state = new_state;
+                self.solution = new_solution;
 
-        if self.params.verbosity >= 1 {
-            println!("Search completed in {:?}", t.elapsed());
-            println!(
-                "Best solution solves {new_solved_block} in {additional_twist_count} ETM ({} ETM total)",
-                self.solution.len(),
-            );
-            println!("{}", self.solution_str());
-            println!();
+                if self.params.verbosity >= 1 {
+                    println!("Search completed in {:?}", t.elapsed());
+                    println!(
+                        "Best solution solves {new_solved_block} in {additional_twist_count} ETM ({} ETM total)",
+                        self.solution.len(),
+                    );
+                    println!("{}", self.solution_str());
+                    println!();
+                }
+
+                new_solved_block
+            }
+
+            None => {
+                self.params.max_depth += 1;
+                if self.params.verbosity >= 1 {
+                    println!(
+                        "No solution found; deepening search to {} ...",
+                        self.params.max_depth
+                    );
+                }
+                let deeper_result =
+                    self.solve_any_candidate_block(block_name, expected_blocks, candidate_blocks);
+                self.params.max_depth -= 1;
+                return deeper_result;
+            }
         }
-
-        Ok(new_solved_block)
     }
 }

@@ -30,21 +30,35 @@ fn main() {
     // search_3d(&scramble, max_depth, 1);
     // search_3d(&scramble, max_depth, 2);
 
-    let scramble = scramble_4d();
-    // let scramble = "DI2 OF DF UBRO BURI BDLI FDLO UBRI ODL IL LBO UBLO FUL FU2 RDBI UFL UFRO DF RUBI OUBL DBRI LBI RUFO FDLO DBRI ODBL BD2 RU2 UR UI2 DL ID FDLI RI2 OUFR IUF FL IUFR LI OUL DB DBLO BDRI DBLI LDBI LU DR2 LI2 UFL DF OUF IR BURO RB IR IL UBRO ODBL FUI LUO UFRO DI2 LBI DB FDLO LUBO UBLO UB2 FULO FULI LUF DI UBRO DBRO FL2 OUBL OUFL DFRO FULO UBL OL OUL LO IU LDBI BUL LUBI UFL FURO LUF DBRI LDBI ODFL OB RBI FI2 IL FU IUBR DRO";
-    println!("Scramble: {scramble}");
-    println!();
-    // let scramble = "IDFL LF UBI IUB IL2 RUBO IUBR DO DLO IUBL UI2 ID FULI LUBO OUF DFRI DL BULO FLI LUBI FR BLO UBO UBRO OUFL IU RFI BR2 RI ID IB2 OUBL RUBO DFLO DFRO BO BDL UFRO OUFL ID BURO IBL OUL BD IBL DBLI FDLO BUO DBLO FLO LDF BRO ID FLI IUF OL OL OBL ULO BUO FURI UL2 BR FDLO IUBL UBLO IBL BR2 IUBL BURO IU2 DF ODBL LDBO BR RUB LUBI IU2 FURI IUL OUL ODBR OL2 IB DL UB BO OUB FL2 DFRO ODBR UFRI RI RUFI RDBO IUR UBO BUL RDFI LUFO";
-    search_4d(&scramble).unwrap();
+    let mut results = vec![];
+    for i in 0..10 {
+        let scramble = scramble_4d();
+        println!("\n\n---- STARTING SEARCH #{} ----\n", i + 1);
+        results.push(search_4d(&scramble));
+    }
+    println!("\n\n---- RESULTS ----\n");
+    for (move_count, time) in results {
+        println!("{move_count} ETM in {time:?}");
+    }
+
+    // let scramble = scramble_4d();
+    // // let scramble = "LF IB2 IDFR LF RBI ID ODFL BUO IBL BR2 OUF BLO IDFL OB FI LD RU2 DFLI FUO IU2 OUBR BD IDFL OUB LDFO BDO FUL IR IUL OL2 LDBI FL BL IU LI2 ODFR OB2 OUF DFLI RI LO RF RB LD IDBL UBRO LDFI FULI FI2 OUF ODFL UFRI LU DL FU LDBO DFRI OB LD UI FLI FO IF IFL DFLI LD FD DBO RUBI DO FD IDFL UBI LUBI BURO BDRI BU BD2 RDBI UBL DB2 LO LDBO OL2 RF BDO ULI UFLO BR2 LB IL DFRI DFR FUI ULI FL IU UBRI LO BURI";
+    // println!("Scramble: {scramble}");
+    // println!();
+    // // let scramble = "IDFL LF UBI IUB IL2 RUBO IUBR DO DLO IUBL UI2 ID FULI LUBO OUF DFRI DL BULO FLI LUBI FR BLO UBO UBRO OUFL IU RFI BR2 RI ID IB2 OUBL RUBO DFLO DFRO BO BDL UFRO OUFL ID BURO IBL OUL BD IBL DBLI FDLO BUO DBLO FLO LDF BRO ID FLI IUF OL OL OBL ULO BUO FURI UL2 BR FDLO IUBL UBLO IBL BR2 IUBL BURO IU2 DF ODBL LDBO BR RUB LUBI IU2 FURI IUL OUL ODBR OL2 IB DL UB BO OUB FL2 DFRO ODBR UFRI RI RUFI RDBO IUR UBO BUL RDFI LUFO";
+    // search_4d(&scramble).unwrap();
 }
 
-fn search_4d(scramble_str: &str) -> Result<(), String> {
+fn search_4d(scramble_str: &str) -> (usize, std::time::Duration) {
+    let t0 = std::time::Instant::now();
+
     let mut search = BlockBuildingSearch {
         puzzle: &RUBIKS_4D,
         params: BlockBuildingSearchParams {
             heuristic: Heuristic::Fast,
             max_depth: 4,
-            deepen_when_stuck: false,
+            parallel_depth: 2,
+            force_parallel_determinism: false,
             trim: 0,
             verbosity: 1,
         },
@@ -55,20 +69,12 @@ fn search_4d(scramble_str: &str) -> Result<(), String> {
         parenthesize_segments: false,
     };
 
-    let t0 = std::time::Instant::now();
-
     // Mid + left block
-    let block_2222 = search.solve_any_candidate_block("2x2x2x2", 1, &initial_4d_blocks())?;
-    let block_2223 = search.solve_any_candidate_block(
-        "2x2x2x3",
-        1,
-        &extensions(block_2222, GripSet::ALL, true),
-    )?;
-    let block_2233 = search.solve_any_candidate_block(
-        "2x2x3x3",
-        1,
-        &extensions(block_2223, GripSet::ALL, true),
-    )?;
+    let block_2222 = search.solve_any_candidate_block("2x2x2x2", 1, &initial_4d_blocks());
+    let block_2223 =
+        search.solve_any_candidate_block("2x2x2x3", 1, &extensions(block_2222, GripSet::ALL, true));
+    let block_2233 =
+        search.solve_any_candidate_block("2x2x3x3", 1, &extensions(block_2223, GripSet::ALL, true));
 
     let right_block_candidate_grips = block_2233.inactive_grips();
     let [rbcg1, rbcg2] = right_block_candidate_grips.iter().collect_array().unwrap();
@@ -94,7 +100,7 @@ fn search_4d(scramble_str: &str) -> Result<(), String> {
             .collect_vec();
 
     let right_block_1222 =
-        search.solve_any_candidate_block("right 1x2x2x2", 2, &right_block_1222_candidates)?;
+        search.solve_any_candidate_block("right 1x2x2x2", 2, &right_block_1222_candidates);
 
     let (last_f2l_grip, last_layer_grip) =
         if right_block_1222.grip_status(rbcg1) == Some(GripStatus::Active) {
@@ -103,13 +109,11 @@ fn search_4d(scramble_str: &str) -> Result<(), String> {
             (rbcg2, rbcg1)
         };
 
-    search.params.deepen_when_stuck = true;
-
     let right_block_1223 = search.solve_any_candidate_block(
         "right 1x2x2x3",
         2,
         &extensions(right_block_1222, grips_within_right_block, true),
-    )?;
+    );
 
     let last_f2l_grip_2 =
         (right_block_1223.inactive_grips() - last_layer_grip - last_f2l_grip.opposite())
@@ -126,21 +130,21 @@ fn search_4d(scramble_str: &str) -> Result<(), String> {
         .restrict_to_inactive_grip(f2l_b_grips[1])
         .unwrap();
 
-    search.solve_any_candidate_block("last F2L-A pair", 3, &[last_f2l_a_pair])?;
+    search.solve_any_candidate_block("last F2L-A pair", 3, &[last_f2l_a_pair]);
     search.solve_any_candidate_block(
         "second-to-last F2L-b pair",
         3,
         &f2l_b_grips.map(|g| last_f2l_a_pair.expand_to_active_grip(g)),
-    )?;
+    );
     let f2l_block = Block::new_solved([], [last_layer_grip]).unwrap();
-    search.solve_any_candidate_block("final F2L-b pair", 1, &[f2l_block])?;
+    search.solve_any_candidate_block("final F2L-b pair", 1, &[f2l_block]);
 
     println!();
     println!("Whole search completed in {:?}", t0.elapsed());
     println!("Best solution found is {} ETM", search.solution.len());
     println!("{}", search.solution_str());
 
-    Ok(())
+    (search.solution.len(), t0.elapsed())
 }
 
 fn scramble_3d() -> String {
