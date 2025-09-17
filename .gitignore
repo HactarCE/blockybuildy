@@ -1,3 +1,4 @@
 /target
 *.hsc
+*.log
 flamegraph.svg

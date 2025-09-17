@@ -26,6 +26,11 @@ impl Twist {
     pub fn new(grip: GripId, transform: ElemId) -> Self {
         Self { grip, transform }
     }
+
+    #[must_use]
+    pub fn inv(self) -> Self {
+        Self::new(self.grip, self.transform.inv())
+    }
 }
 impl fmt::Debug for Twist {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

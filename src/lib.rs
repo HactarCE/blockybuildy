@@ -1,3 +1,4 @@
+pub mod mc4d;
 pub mod search;
 pub mod sim;
 pub mod stackvec;

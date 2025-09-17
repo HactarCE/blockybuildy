@@ -1,9 +1,20 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, error::Error};
 
 use itertools::Itertools;
 use robodoan::*;
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
+    if let Some(filename) = std::env::args().nth(1) {
+        let log_file_text = std::fs::read_to_string(&filename)?;
+        let scramble = mc4d::Mc4dScramble::from_str(&log_file_text)?;
+        println!("Loaded log file from {filename}");
+        println!();
+        let (solve_twists, _elapsed_time) = search_4d(scramble.scramble());
+        println!();
+        std::fs::write("out.log", scramble.to_string(false, solve_twists))?;
+        return Ok(());
+    }
+
     // let scramble = scramble_3d();
     // // let scramble = "U' B2 U2 L2 B2 U2 L F2 L' U2 R2 F2 L' B L B D' F' D2 L' B";
     // let max_depth = 5;
@@ -27,14 +38,18 @@ fn main() {
     // }
 
     // let scramble = scramble_4d();
-    let scramble = "LF IB2 IDFR LF RBI ID ODFL BUO IBL BR2 OUF BLO IDFL OB FI LD RU2 DFLI FUO IU2 OUBR BD IDFL OUB LDFO BDO FUL IR IUL OL2 LDBI FL BL IU LI2 ODFR OB2 OUF DFLI RI LO RF RB LD IDBL UBRO LDFI FULI FI2 OUF ODFL UFRI LU DL FU LDBO DFRI OB LD UI FLI FO IF IFL DFLI LD FD DBO RUBI DO FD IDFL UBI LUBI BURO BDRI BU BD2 RDBI UBL DB2 LO LDBO OL2 RF BDO ULI UFLO BR2 LB IL DFRI DFR FUI ULI FL IU UBRI LO BURI";
-    println!("Scramble: {scramble}");
+    let scramble = parse_twists(
+        "LF IB2 IDFR LF RBI ID ODFL BUO IBL BR2 OUF BLO IDFL OB FI LD RU2 DFLI FUO IU2 OUBR BD IDFL OUB LDFO BDO FUL IR IUL OL2 LDBI FL BL IU LI2 ODFR OB2 OUF DFLI RI LO RF RB LD IDBL UBRO LDFI FULI FI2 OUF ODFL UFRI LU DL FU LDBO DFRI OB LD UI FLI FO IF IFL DFLI LD FD DBO RUBI DO FD IDFL UBI LUBI BURO BDRI BU BD2 RDBI UBL DB2 LO LDBO OL2 RF BDO ULI UFLO BR2 LB IL DFRI DFR FUI ULI FL IU UBRI LO BURI",
+    );
+    println!("Scramble: {}", scramble.iter().join(" "));
     println!();
     // // let scramble = "IDFL LF UBI IUB IL2 RUBO IUBR DO DLO IUBL UI2 ID FULI LUBO OUF DFRI DL BULO FLI LUBI FR BLO UBO UBRO OUFL IU RFI BR2 RI ID IB2 OUBL RUBO DFLO DFRO BO BDL UFRO OUFL ID BURO IBL OUL BD IBL DBLI FDLO BUO DBLO FLO LDF BRO ID FLI IUF OL OL OBL ULO BUO FURI UL2 BR FDLO IUBL UBLO IBL BR2 IUBL BURO IU2 DF ODBL LDBO BR RUB LUBI IU2 FURI IUL OUL ODBR OL2 IB DL UB BO OUB FL2 DFRO ODBR UFRI RI RUFI RDBO IUR UBO BUL RDFI LUFO";
     dbg!(search_4d(&scramble));
+
+    Ok(())
 }
 
-fn search_4d(scramble_str: &str) -> (usize, std::time::Duration) {
+fn search_4d(scramble: &[Twist]) -> (Vec<Twist>, std::time::Duration) {
     let t0 = std::time::Instant::now();
 
     let mut search = BlockBuildingSearch {
@@ -47,7 +62,7 @@ fn search_4d(scramble_str: &str) -> (usize, std::time::Duration) {
             trim: 0,
             verbosity: 1,
         },
-        scramble: parse_twists(scramble_str),
+        scramble: scramble.to_vec(),
         state: PuzzleState::default(),
         solution: vec![],
         solution_segments: vec![],
@@ -129,21 +144,15 @@ fn search_4d(scramble_str: &str) -> (usize, std::time::Duration) {
     println!("Best solution found is {} ETM", search.solution.len());
     println!("{}", search.solution_str());
 
-    (search.solution.len(), t0.elapsed())
+    (search.solution, t0.elapsed())
 }
 
-fn scramble_3d() -> String {
-    RUBIKS_3D
-        .random_moves(&mut rand::rng(), 100)
-        .map(|t| t.to_string())
-        .join(" ")
+fn scramble_3d() -> Vec<Twist> {
+    RUBIKS_3D.random_moves(&mut rand::rng(), 100).collect()
 }
 
-fn scramble_4d() -> String {
-    RUBIKS_4D
-        .random_moves(&mut rand::rng(), 100)
-        .map(|t| t.to_string())
-        .join(" ")
+fn scramble_4d() -> Vec<Twist> {
+    RUBIKS_4D.random_moves(&mut rand::rng(), 100).collect()
 }
 
 // fn search_3d(scramble: &str, max_depth: usize, trim: usize) {
