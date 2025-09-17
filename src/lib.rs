@@ -7,8 +7,6 @@ pub use stackvec::StackVec;
 
 pub use crate::search::*;
 
-// pub const MAX_BLOCKS: usize = 10;
-pub const MAX_BLOCKS: usize = 31;
-// bigger number is sometimes better???
+pub const MAX_BLOCKS: usize = 21; // 63 bytes (+1 for length)
 
 pub const USE_3D_TWIST_NAMES: bool = false;

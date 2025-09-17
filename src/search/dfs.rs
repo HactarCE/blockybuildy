@@ -2,7 +2,7 @@ use rayon::prelude::*;
 
 use super::*;
 
-/// Runs iterative-deepening depth-first searches repeatedly via
+/// Runs iterative deepening depth-first searches repeatedly via
 /// [`iddfs_blockbuild()`] to blockbuild from `state` until there are at most
 /// `target_blocks` remaining.
 ///
@@ -51,7 +51,7 @@ pub fn blockbuild_via_repeated_iddfs(
     Some(solution_segments)
 }
 
-/// Runs an iterative-deepening depth-first search to `max_depth` for a sequence
+/// Runs an iterative deepening depth-first search to `max_depth` for a sequence
 /// of moves that results in at most `expected_blocks` blocks. Returns the
 /// number of moves in the solution if one is found, or `None` if the search
 /// failed.

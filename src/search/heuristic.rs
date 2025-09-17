@@ -22,16 +22,24 @@ impl Heuristic {
         remaining_moves: usize,
     ) -> bool {
         let remaining_pairings_needed = state.blocks.len() - expected_blocks;
-        let max_pairings_possible = match self {
+
+        remaining_pairings_needed <= self.combinatoric_limit(expected_blocks, remaining_moves)
+            && remaining_pairings_needed <= self.grip_theoretic_limit(state, remaining_moves)
+    }
+
+    /// Returns the maximum number of block pairings possible using a naive
+    /// combinatoric approach.
+    fn combinatoric_limit(self, expected_blocks: usize, remaining_moves: usize) -> usize {
+        match self {
             Heuristic::Fast => 1 << remaining_moves,
             Heuristic::Correct => (1 << remaining_moves) * expected_blocks,
-        };
-        if remaining_pairings_needed > max_pairings_possible {
-            return false;
         }
-
+    }
+    /// Returns the maximum number of block pairings using a grip-theoretic
+    /// approach.
+    fn grip_theoretic_limit(self, state: PuzzleState, remaining_moves: usize) -> usize {
         let blocks_when_solved = state.blocks.map(|b| b.at_solved().layers());
-        let mut max_blocks_solvable = 0;
+        let mut max_pairings_possible = 0;
         for (i, (b1, b1_when_solved)) in
             std::iter::zip(state.blocks, blocks_when_solved).enumerate()
         {
@@ -66,12 +74,9 @@ impl Heuristic {
                 }
             }
 
-            max_blocks_solvable += max_blocks_solvable_using_b1;
-        }
-        if max_blocks_solvable < remaining_pairings_needed {
-            return false;
+            max_pairings_possible += max_blocks_solvable_using_b1;
         }
 
-        true
+        max_pairings_possible
     }
 }
