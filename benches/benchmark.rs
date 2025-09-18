@@ -1,5 +1,4 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use itertools::Itertools;
 use rand_pcg::Pcg64Mcg;
 use robodoan::*;
 
@@ -18,7 +17,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut rng = Pcg64Mcg::new(0x_5c8d9681_fb970317_36ec6b11_2fa3c0bd);
 
     let move_count = 32;
-    let gen_random_moves = move || puzzle.random_moves(&mut rng, move_count).collect_vec();
+    let gen_random_moves = move || puzzle.random_moves(&mut rng, move_count);
 
     let puzzle_with_2x2x2x2_block = PuzzleState::default()
         .add_block_with_setup_moves(puzzle, &[], Block::new_solved([], [R, U, F, O]).unwrap())

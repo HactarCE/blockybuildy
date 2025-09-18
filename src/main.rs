@@ -6,7 +6,7 @@ use robodoan::*;
 fn main() -> Result<(), Box<dyn Error>> {
     if let Some(filename) = std::env::args().nth(1) {
         let log_file_text = std::fs::read_to_string(&filename)?;
-        let scramble = mc4d::Mc4dScramble::from_str(&log_file_text)?;
+        let scramble: mc4d::Mc4dScramble = log_file_text.parse()?;
         println!("Loaded log file from {filename}");
         println!();
         // let (solve_twists, _elapsed_time) = search_4d(scramble.scramble());

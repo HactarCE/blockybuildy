@@ -80,7 +80,7 @@ impl ElemId {
 
     #[inline]
     pub fn from_id(id: u8) -> Option<Self> {
-        (id < group::ELEM_COUNT as u8).then(|| Self(id))
+        (id < group::ELEM_COUNT as u8).then_some(Self(id))
     }
 
     /// Constructs an element from `id`.

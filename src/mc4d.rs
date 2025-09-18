@@ -86,7 +86,7 @@ impl Mc4dTwist {
 
         let transform = std::iter::repeat_n(
             if self.multiplier < 0 { t.inv() } else { t },
-            self.multiplier.abs() as usize,
+            self.multiplier.unsigned_abs() as usize,
         )
         .fold(IDENT, |a, b| a * b);
 
@@ -148,8 +148,10 @@ pub struct Mc4dScramble {
     scramble: Vec<Twist>,
     puzzle_offset_from_scramble: ElemId,
 }
-impl Mc4dScramble {
-    pub fn from_str(s: &str) -> Result<Self, &'static str> {
+impl FromStr for Mc4dScramble {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = match s.rsplit_once("m|") {
             Some((before_boundary, _after_boundary)) => before_boundary,
             None => s,
@@ -209,7 +211,8 @@ impl Mc4dScramble {
             puzzle_offset_from_scramble: puzzle_offset,
         })
     }
-
+}
+impl Mc4dScramble {
     pub fn to_string(&self, solved: bool, solve_twists: Vec<Twist>) -> String {
         let move_count = solve_twists.len();
         let state = if solved { "3" } else { &self.scramble_state };

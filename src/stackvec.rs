@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut, Index, IndexMut, RangeTo};
 
 #[repr(align(8))]
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-#[must_use]
+#[must_use = "this method returns a new value rather than modifying its input"]
 pub struct StackVec<T, const CAP: usize> {
     len: u8,
     elems: [T; CAP],
@@ -42,7 +42,7 @@ impl<T: Default + Copy, const CAP: usize> StackVec<T, CAP> {
         Self::default()
     }
 
-    #[must_use]
+    #[must_use = "this method returns a new value rather than modifying its input"]
     #[inline]
     pub fn from_slice(array: &[T]) -> Option<Self> {
         let mut ret = Self::default();
@@ -54,18 +54,18 @@ impl<T: Default + Copy, const CAP: usize> StackVec<T, CAP> {
         Some(ret)
     }
 
-    #[must_use]
+    #[must_use = "this method returns a new value rather than modifying its input"]
     pub fn push(mut self, elem: T) -> Option<Self> {
         *self.elems.get_mut(self.len as usize)? = elem;
         self.len += 1;
         Some(self)
     }
 
-    #[must_use]
+    #[must_use = "this method returns a new value rather than modifying its input"]
     pub fn map<U: Default + Copy>(self, f: impl FnMut(T) -> U) -> StackVec<U, CAP> {
         StackVec::from_iter(self.into_iter().map(f)).unwrap()
     }
-    #[must_use]
+    #[must_use = "this method returns a new value rather than modifying its input"]
     pub fn retain_unsorted(mut self, mut f: impl FnMut(T) -> bool) -> StackVec<T, CAP> {
         if self.len == 0 {
             return self;
@@ -81,7 +81,7 @@ impl<T: Default + Copy, const CAP: usize> StackVec<T, CAP> {
         self
     }
 
-    #[must_use]
+    #[must_use = "this method returns a new value rather than modifying its input"]
     pub fn extend(mut self, iter: impl IntoIterator<Item = T>) -> Option<Self> {
         let iter = iter.into_iter();
 
@@ -96,11 +96,12 @@ impl<T: Default + Copy, const CAP: usize> StackVec<T, CAP> {
         Some(self)
     }
 
+    #[allow(clippy::should_implement_trait)] // can't impl FromIterator<T> for Option<Self>
     pub fn from_iter(iter: impl IntoIterator<Item = T>) -> Option<Self> {
         Self::new().extend(iter)
     }
 
-    #[must_use]
+    #[must_use = "this method returns a new value rather than modifying its input"]
     pub fn swap_remove(mut self, index: usize) -> Self {
         self[index] = self[self.len() - 1];
         self.len -= 1;
@@ -108,7 +109,7 @@ impl<T: Default + Copy, const CAP: usize> StackVec<T, CAP> {
     }
 }
 impl<T, const CAP: usize> StackVec<T, CAP> {
-    #[must_use]
+    #[must_use = "this method returns a new value rather than modifying its input"]
     pub fn sorted_unstable(mut self) -> Self
     where
         T: Ord,
@@ -116,12 +117,12 @@ impl<T, const CAP: usize> StackVec<T, CAP> {
         self.sort_unstable();
         self
     }
-    #[must_use]
+    #[must_use = "this method returns a new value rather than modifying its input"]
     pub fn sorted_unstable_by_key<K: Ord>(mut self, f: impl FnMut(&T) -> K) -> Self {
         self.sort_unstable_by_key(f);
         self
     }
-    #[must_use]
+    #[must_use = "this method returns a new value rather than modifying its input"]
     pub fn sorted_unstable_by(mut self, compare: impl FnMut(&T, &T) -> Ordering) -> Self {
         self.sort_unstable_by(compare);
         self

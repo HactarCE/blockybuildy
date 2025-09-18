@@ -39,7 +39,7 @@ impl Solver {
                     let setup_moves =
                         self.all_prior_twists_for_segment(init.previous_segment_index);
                     if let Some(new_segment) =
-                        init.push_block(&self.puzzle, &setup_moves, new_block, new_meta)
+                        init.push_block(self.puzzle, &setup_moves, new_block, new_meta)
                     {
                         solutions_buffer.push(new_segment);
                     }
@@ -183,7 +183,7 @@ fn do_step_blockbuilding(
 }
 
 #[must_use]
-pub fn do_step<O: Copy + Send + Sync>(
+fn do_step<O: Copy + Send + Sync>(
     params: BlockBuildingSearchParams,
     prev_stage: &[SolutionSegment],
     search_options: impl IntoIterator<Item = O>,
@@ -307,7 +307,7 @@ pub fn dfs_blockbuild(
                     remaining_depth - 1,
                     solutions_buffer,
                     new_partial_solution,
-                )
+                );
             }
         }
     }

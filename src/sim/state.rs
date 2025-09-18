@@ -24,7 +24,7 @@ impl PuzzleState {
             self.blocks
                 .into_iter()
                 .flat_map(|block| twist * block)
-                .filter_map(|x| x),
+                .flatten(), // Option<T> -> T
         )?
         .sorted_unstable_by_key(|b| b.attitude());
 
@@ -94,7 +94,7 @@ impl PuzzleState {
                 blocks = blocks
                     .into_iter()
                     .flat_map(|b| b.split(g))
-                    .filter_map(|b| b)
+                    .flatten() // Option<T> -> T
                     .collect();
             }
             blocks

@@ -124,6 +124,7 @@ impl SolutionMetadata {
         assert_eq!(self.stage, 6);
 
         // funny trick to get the number not already covered
+        #[allow(clippy::identity_op)]
         let ud_axis = 0 + 1 + 2 + 3
             - self.last_layer().axis()
             - self.front_grip().axis()
