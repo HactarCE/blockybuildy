@@ -51,8 +51,10 @@ impl Puzzle {
         self.grips.iter().map(|g| g.id).collect()
     }
 
-    pub fn random_moves(&self, rng: &mut impl Rng, count: usize) -> impl Iterator<Item = Twist> {
-        (0..count).map(move |_| *self.twists.choose(rng).unwrap())
+    pub fn random_moves(&self, rng: &mut impl Rng, count: usize) -> Vec<Twist> {
+        (0..count)
+            .map(move |_| *self.twists.choose(rng).unwrap())
+            .collect()
     }
 }
 

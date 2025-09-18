@@ -15,7 +15,7 @@ pub enum GripStatus {
 
 /// Layer mask of a block, represented using 12 bits: `0www_0zzz_0yyy_0xxx`
 /// (MSb..LSb)
-#[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PackedLayers([u8; 2]);
 
 impl PackedLayers {
@@ -58,9 +58,14 @@ impl PackedLayers {
             Some(self)
         }
     }
+    #[inline]
     pub const fn is_empty_on_any_axis(self) -> bool {
         let bits = self.to_u16();
         (bits | (bits >> 1) | (bits >> 2)) & 0b_0001_0001_0001_0001 != 0b_0001_0001_0001_0001
+    }
+    #[inline]
+    pub const fn is_fully_blocked_on_axis(self, axis: usize) -> bool {
+        self.bits_for_axis(axis) == 0b111
     }
 
     #[inline]

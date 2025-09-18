@@ -8,7 +8,7 @@ use super::puzzle::Puzzle;
 use super::twists::Twist;
 use crate::StackVec;
 
-#[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(align(64))]
 pub struct PuzzleState {
     pub blocks: StackVec<Block, { crate::MAX_BLOCKS }>,

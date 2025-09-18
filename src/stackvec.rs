@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::fmt;
-use std::ops::{Deref, DerefMut, Index, IndexMut};
+use std::ops::{Deref, DerefMut, Index, IndexMut, RangeTo};
 
 #[repr(align(8))]
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -8,6 +8,17 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 pub struct StackVec<T, const CAP: usize> {
     len: u8,
     elems: [T; CAP],
+}
+
+impl<T: PartialOrd, const CAP: usize> PartialOrd for StackVec<T, CAP> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        PartialOrd::partial_cmp(&self[..], &other[..])
+    }
+}
+impl<T: Ord, const CAP: usize> Ord for StackVec<T, CAP> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Ord::cmp(&self[..], &other[..])
+    }
 }
 
 impl<T: fmt::Debug, const CAP: usize> fmt::Debug for StackVec<T, CAP> {
@@ -131,21 +142,33 @@ impl<T, const CAP: usize> DerefMut for StackVec<T, CAP> {
     }
 }
 
-impl<T, const CAP: usize> Index<usize> for StackVec<T, CAP> {
-    type Output = T;
+impl<I, T, const CAP: usize> Index<I> for StackVec<T, CAP>
+where
+    [T]: Index<I>,
+    [T]: Index<RangeTo<usize>, Output = [T]>, // shouldn't be necessary
+{
+    type Output = <[T] as Index<I>>::Output;
 
     #[track_caller]
-    fn index(&self, index: usize) -> &Self::Output {
-        assert!(index < self.len as usize, "index out of bounds");
-        &self.elems[index]
+    fn index(&self, index: I) -> &Self::Output {
+        let len = self.len();
+        // SAFETY: `len < CAP` is an invariant of the data structure
+        unsafe { std::hint::assert_unchecked(len < CAP) };
+        &self.elems[..len][index]
     }
 }
 
-impl<T, const CAP: usize> IndexMut<usize> for StackVec<T, CAP> {
+impl<I, T, const CAP: usize> IndexMut<I> for StackVec<T, CAP>
+where
+    [T]: IndexMut<I>,
+    [T]: IndexMut<RangeTo<usize>, Output = [T]>, // shouldn't be necessary
+{
     #[track_caller]
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        assert!(index < self.len as usize, "index out of bounds");
-        &mut self.elems[index]
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        let len = self.len();
+        // SAFETY: `len < CAP` is an invariant of the data structure
+        unsafe { std::hint::assert_unchecked(len < CAP) };
+        &mut self.elems[..len][index]
     }
 }
 

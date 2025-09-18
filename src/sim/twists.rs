@@ -17,7 +17,7 @@ pub static TWISTS_FROM_NAME: HashMap<String, Twist> =
         .map(|(t, s)| (s.clone(), t.clone()))
         .collect();
 
-#[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Twist {
     pub grip: GripId,
     pub transform: ElemId,

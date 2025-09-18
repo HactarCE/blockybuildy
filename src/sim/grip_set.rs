@@ -149,7 +149,7 @@ impl fmt::Display for Piece {
 
 /// Block of pieces with compatible attitudes, displayed as
 /// `ACTIVE_GRIPS$blocked_grips!INACTIVE_GRIPS`.
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Block {
     layers: PackedLayers,
     attitude: ElemId,
@@ -224,6 +224,9 @@ impl Block {
     }
     pub fn blocked_grips(self) -> GripSet {
         self.grips_with_status(GripStatus::Blocked)
+    }
+    pub fn is_fully_blocked_on_axis(self, axis: usize) -> bool {
+        self.layers.is_fully_blocked_on_axis(axis)
     }
     fn grips_with_status(self, status: GripStatus) -> GripSet {
         HYPERCUBE_GRIPS
