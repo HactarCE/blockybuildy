@@ -10,6 +10,7 @@ use super::twists::Twist;
 impl Mul for ElemId {
     type Output = ElemId;
 
+    #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         self.hint_assert_in_bounds();
         rhs.hint_assert_in_bounds();
@@ -24,6 +25,7 @@ pub trait TransformByElem {
 impl Mul<Vec4> for ElemId {
     type Output = Vec4;
 
+    #[inline]
     fn mul(self, rhs: Vec4) -> Self::Output {
         self.hint_assert_in_bounds();
         let mat = CHIRAL_BC4.mul_elem_vec[self.id() as usize];
@@ -34,6 +36,7 @@ impl Mul<Vec4> for ElemId {
 impl Mul<GripId> for ElemId {
     type Output = GripId;
 
+    #[inline]
     fn mul(self, rhs: GripId) -> Self::Output {
         self.hint_assert_in_bounds();
         rhs.hint_assert_in_bounds();
@@ -44,6 +47,7 @@ impl Mul<GripId> for ElemId {
 impl Mul<GripSet> for ElemId {
     type Output = GripSet;
 
+    #[inline]
     fn mul(self, rhs: GripSet) -> Self::Output {
         self.hint_assert_in_bounds();
         GripSet(rhs.iter().map(|g| 1 << (self * g).id()).sum())
@@ -53,6 +57,7 @@ impl Mul<GripSet> for ElemId {
 impl Mul<Piece> for ElemId {
     type Output = Piece;
 
+    #[inline]
     fn mul(self, rhs: Piece) -> Self::Output {
         Piece {
             grips: self * rhs.grips,
@@ -62,12 +67,14 @@ impl Mul<Piece> for ElemId {
 }
 
 impl TransformByElem for ElemId {
+    #[inline]
     fn transform_by(self, elem: ElemId) -> Self {
         elem * self * elem.inv()
     }
 }
 
 impl TransformByElem for Twist {
+    #[inline]
     fn transform_by(self, elem: ElemId) -> Self {
         Twist {
             grip: elem * self.grip,

@@ -43,10 +43,12 @@ impl ElemId {
     pub const IDENT: Self = IDENT;
 
     /// Returns the inverse element.
+    #[inline]
     pub fn inv(self) -> ElemId {
         group::CHIRAL_BC4.inv_elem[self.0 as usize]
     }
 
+    #[inline]
     pub fn transform<T: TransformByElem>(self, obj: T) -> T {
         obj.transform_by(self)
     }
@@ -56,6 +58,7 @@ impl ElemId {
     /// # Panics
     ///
     /// Panics if `id` is out of range (must be less [`group::ELEM_COUNT`]).
+    #[inline]
     pub const fn new(id: u8) -> Self {
         assert!(id < group::ELEM_COUNT as u8, "element ID out of range");
         Self(id)
@@ -70,10 +73,12 @@ impl ElemId {
     }
 
     /// Returns the internal ID.
+    #[inline]
     pub fn id(self) -> u8 {
         self.0
     }
 
+    #[inline]
     pub fn from_id(id: u8) -> Option<Self> {
         (id < group::ELEM_COUNT as u8).then(|| Self(id))
     }
@@ -83,6 +88,7 @@ impl ElemId {
     /// # Safety
     ///
     /// `id` must be strictly less than [`group::ELEM_COUNT`].
+    #[inline]
     pub unsafe fn from_id_unchecked(id: u8) -> Self {
         Self(id)
     }
@@ -156,9 +162,9 @@ fn plane_stabilizer(v1: Vec4, v2: Vec4) -> [ElemId; 4] {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use proptest::prelude::*;
+
+    use super::*;
 
     #[test]
     fn test_simple_rotations() {
