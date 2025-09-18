@@ -1,11 +1,14 @@
 //! MC4D log file compat
 
-use std::{collections::HashMap, fmt, str::FromStr};
+use std::collections::HashMap;
+use std::fmt;
+use std::str::FromStr;
 
 use cgmath::vec4;
 use itertools::Itertools;
 
-use crate::{StackVec, sim::*};
+use crate::StackVec;
+use crate::sim::*;
 
 const MAGIC_STRING: &str = "MagicCube4D";
 const LOG_VERSION: &str = "3";

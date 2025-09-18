@@ -1,12 +1,10 @@
 use std::fmt;
 use std::ops::{BitAnd, BitOr, BitXor, Mul};
 
-use crate::StackVec;
-
-use super::elements::ElemId;
 use super::elements::*;
 use super::grip_set::GripSet;
 use super::grips::*;
+use crate::StackVec;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum GripStatus {

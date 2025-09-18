@@ -1,5 +1,4 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-
 use itertools::Itertools;
 use rand_pcg::Pcg64Mcg;
 use robodoan::*;
