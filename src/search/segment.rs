@@ -6,11 +6,11 @@ use crate::sim::*;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct SolutionSegment {
-    pub state: PuzzleState,
-    pub segment_twists: StackVec<Twist, { crate::MAX_SOLUTION_SEGMENT_LEN }>,
-    pub previous_segment_index: usize,
-    pub total_twist_count: usize,
-    pub meta: SolutionMetadata,
+    pub state: PuzzleState, // 64 bytes
+    pub segment_twists: StackVec<Twist, { crate::MAX_SOLUTION_SEGMENT_LEN }>, // 23 bytes
+    pub previous_segment_index: usize, // 8 bytes
+    pub total_twist_count: usize, // 8 bytes
+    pub meta: SolutionMetadata, // 20 bytes
 }
 impl fmt::Display for SolutionSegment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -20,6 +20,10 @@ impl fmt::Display for SolutionSegment {
     }
 }
 impl SolutionSegment {
+    /// Assertion that `std::mem::size_of::<Self>() == 128`
+    #[allow(unused)]
+    const SIZE_ASSERT: [u8; 128] = [0; std::mem::size_of::<Self>()];
+
     #[must_use]
     pub fn push_twist(&self, twist: Twist, last_grip: Option<GripId>) -> Option<Self> {
         Some(Self {

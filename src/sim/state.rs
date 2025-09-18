@@ -8,6 +8,7 @@ use super::puzzle::Puzzle;
 use super::twists::Twist;
 use crate::StackVec;
 
+/// (64 bytes) State of a puzzle, tracked using [`crate::MAX_BLOCKS`] blocks.
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(align(64))]
 pub struct PuzzleState {

@@ -8,7 +8,7 @@ use crate::sim::*;
 /// which helps when figuring out the next blocks to solve.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SolutionMetadata {
-    stage: usize,
+    stage: u16,
     first_block: Block,
     second_block: Block,
     third_block: Block,
