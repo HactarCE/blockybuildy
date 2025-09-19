@@ -140,10 +140,6 @@ impl PackedLayers {
     /// along which they were merged.
     #[must_use]
     pub fn try_merge_with(self, other: Self) -> Option<(Self, usize)> {
-        if self == other {
-            return None; // same blocks
-        }
-
         let lhs = self.to_u16();
         let rhs = other.to_u16();
         let layer_difference = lhs ^ rhs;
