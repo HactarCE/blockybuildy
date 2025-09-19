@@ -153,8 +153,8 @@ where
     #[track_caller]
     fn index(&self, index: I) -> &Self::Output {
         let len = self.len();
-        // SAFETY: `len < CAP` is an invariant of the data structure
-        unsafe { std::hint::assert_unchecked(len < CAP) };
+        // SAFETY: `len <= CAP` is an invariant of the data structure
+        unsafe { std::hint::assert_unchecked(len <= CAP) };
         &self.elems[..len][index]
     }
 }
@@ -167,8 +167,8 @@ where
     #[track_caller]
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         let len = self.len();
-        // SAFETY: `len < CAP` is an invariant of the data structure
-        unsafe { std::hint::assert_unchecked(len < CAP) };
+        // SAFETY: `len <= CAP` is an invariant of the data structure
+        unsafe { std::hint::assert_unchecked(len <= CAP) };
         &mut self.elems[..len][index]
     }
 }
