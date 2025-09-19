@@ -21,8 +21,8 @@ const MAX_SOLUTION_SEGMENT_LEN: usize = 11;
 
 // If we get fewer than this many solutions, try searching deeper to generate more solutions.
 //
-// Divide these by 2 to get worse solutions but much faster
-const MIN_SOLUTION_COUNT_DEPTH_1: usize = 10_000;
+// Multiply these by 2 to get better solutions slower
+const MIN_SOLUTION_COUNT_DEPTH_1: usize = 25_000;
 const MIN_SOLUTION_COUNT_DEPTH_2: usize = 5_000;
 const MIN_SOLUTION_COUNT_DEPTH_3: usize = 500;
 const MIN_SOLUTION_COUNT_DEPTH_4: usize = 50;
