@@ -16,7 +16,6 @@ pub struct SolutionMetadata {
     last_layer: Option<GripId>, // last grip (last layer)
     right_grip: Option<GripId>, // second-to-last grip (right block in typical 3-block)
     front_grip: Option<GripId>, // third-to-last grip (front grip in typical 3-block)
-    ud_grip: Option<GripId>,    // fourth-to-last grip (U/D grip in typical 3-block)
 }
 
 impl SolutionMetadata {
@@ -47,14 +46,6 @@ impl SolutionMetadata {
     }
     fn front_grip(self) -> GripId {
         self.front_grip.unwrap()
-    }
-
-    fn with_ud_grip(mut self, grip: GripId) -> Self {
-        self.ud_grip = Some(grip);
-        self
-    }
-    fn ud_grip(self) -> GripId {
-        self.ud_grip.unwrap()
     }
 
     fn with_first_block(mut self, block: Block) -> (Block, Self) {
@@ -119,27 +110,5 @@ impl SolutionMetadata {
         let block =
             Block::new_solved([self.front_grip(), self.right_grip()], [self.last_layer()]).unwrap();
         [self.next_stage().with_third_block(block)]
-    }
-    pub fn stage7(self) -> impl IntoIterator<Item = (Block, Self)> {
-        assert_eq!(self.stage, 6);
-
-        // funny trick to get the number not already covered
-        #[allow(clippy::identity_op)]
-        let ud_axis = 0 + 1 + 2 + 3
-            - self.last_layer().axis()
-            - self.front_grip().axis()
-            - self.right_grip().axis();
-
-        GripId::pair_on_axis(ud_axis).map(|g| {
-            self.next_stage()
-                .with_ud_grip(g)
-                .with_third_block(self.third_block.expand_to_active_grip(g.opposite()))
-        })
-    }
-    pub fn stage8(self) -> impl IntoIterator<Item = (Block, Self)> {
-        assert_eq!(self.stage, 7);
-        [self
-            .next_stage()
-            .with_third_block(self.third_block.expand_to_active_grip(self.ud_grip()))]
     }
 }

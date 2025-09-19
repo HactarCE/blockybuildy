@@ -14,22 +14,25 @@ pub use params::BlockBuildingSearchParams;
 pub use segment::{Segment, SegmentId, SegmentStore};
 
 use crate::MAX_SOLUTION_COUNT;
+use crate::Profile;
 use crate::sim::*;
 
 pub struct Solver {
+    profile: Profile,
     puzzle: &'static Puzzle,
     params: BlockBuildingSearchParams,
     segments: SegmentStore,
 }
 impl Solver {
-    pub fn new(scramble: impl Into<Vec<Twist>>) -> Self {
+    pub fn new(profile: Profile, scramble: impl Into<Vec<Twist>>) -> Self {
         Self {
+            profile,
             puzzle: &*RUBIKS_4D,
             params: BlockBuildingSearchParams {
                 heuristic: Heuristic::Fast,
                 max_depth: 4,
                 parallel_depth: 2,
-                verbosity: 5,
+                verbosity: 2,
             },
             segments: SegmentStore::new(scramble.into()),
         }
@@ -40,43 +43,25 @@ impl Solver {
 
         // Keep the call graph flat for recursion.
 
-        log!(self.params, 0, "STAGE 1: mid + left, 2x2x2x2 block");
-        self.do_blockbuilding_stage(1, |meta| meta.stage1());
-        log!(self.params);
+        println!("\nSTAGE 1: mid + left, 2x2x2x2 block");
+        self.do_blockbuilding_stage(self.profile.select(1, 3), |meta| meta.stage1());
 
-        log!(self.params, 0, "STAGE 2: mid + left, 2x2x3x2 block");
-        self.do_blockbuilding_stage(1, |meta| meta.stage2());
-        log!(self.params);
+        println!("\nSTAGE 2: mid + left, 2x2x3x2 block");
+        self.do_blockbuilding_stage(self.profile.select(1, 3), |meta| meta.stage2());
 
-        log!(self.params, 0, "STAGE 3: mid + left, 2x3x3x2 block");
-        self.do_blockbuilding_stage(1, |meta| meta.stage3());
-        log!(self.params);
+        println!("\nSTAGE 3: mid + left, 2x3x3x2 block");
+        self.do_blockbuilding_stage(self.profile.select(2, 1), |meta| meta.stage3());
 
-        log!(self.params, 0, "STAGE 4: right (mid + left), 2x2x2x1 block");
-        self.do_blockbuilding_stage(2, |meta| meta.stage4());
-        log!(self.params);
+        println!("\nSTAGE 4: right (mid + left), 2x2x2x1 block");
+        self.do_blockbuilding_stage(self.profile.select(2, 4), |meta| meta.stage4());
 
-        log!(self.params, 0, "STAGE 5: right (mid + left), 2x2x3x1 block");
-        self.do_blockbuilding_stage(2, |meta| meta.stage5());
-        log!(self.params);
+        println!("\nSTAGE 5: right (mid + left), 2x2x3x1 block");
+        self.do_blockbuilding_stage(self.profile.select(2, 3), |meta| meta.stage5());
 
-        log!(self.params, 0, "STAGE 6: front-right, last F2L-a pair");
-        self.do_blockbuilding_stage(3, |meta| meta.stage6());
-        log!(self.params);
+        println!("\nSTAGE 6: F2L");
+        self.do_blockbuilding_stage(self.profile.select(1, 1), |meta| meta.stage6());
 
-        log!(
-            self.params,
-            0,
-            "STAGE 7: front-right, second-to-last F2L-b pair"
-        );
-        self.do_blockbuilding_stage(3, |meta| meta.stage7());
-        log!(self.params);
-
-        log!(self.params, 0, "STAGE 8: F2L");
-        self.do_blockbuilding_stage(1, |meta| meta.stage8());
-        log!(self.params);
-
-        println!("Total elapsed time: {:?}", start.elapsed());
+        println!("\nTotal elapsed time: {:?}", start.elapsed());
 
         println!();
         let best_solution = self.segments.best_solution_so_far().unwrap();
@@ -97,11 +82,11 @@ impl Solver {
         target_block_count: usize,
         make_target_blocks: impl Send + Sync + Fn(SolutionMetadata) -> I,
     ) {
+        let t = std::time::Instant::now();
+
         let step = self.segments.next_step();
 
         // Add pieces
-        log!(self.params);
-        log!(self.params, 1, "Adding pieces");
         let new_segments = self.do_step(|this, prev_segments| {
             prev_segments
                 .par_iter()
@@ -121,17 +106,21 @@ impl Solver {
                 })
                 .collect()
         });
-        log!(
-            self.params,
-            1,
-            "Done adding pieces: {} options",
-            new_segments.len()
-        );
         let init_blocks = new_segments
             .iter()
             .map(|segment| segment.state.blocks.len())
             .max()
             .unwrap_or(0);
+
+        println!(
+            "  Added pieces ({} options with {} blocks each)",
+            new_segments.len(),
+            init_blocks,
+        );
+        if new_segments.is_empty() {
+            println!("  WARNING: NO OPTIONS. You may need to increase `MAX_BLOCKS`");
+        }
+
         self.segments.add_segments(step, new_segments);
 
         // Blockbuild
@@ -142,12 +131,11 @@ impl Solver {
             //     std::process::exit(1);
             // }
         }
+
+        println!("  Completed stage in {:?}", t.elapsed());
     }
 
     fn do_blockbuilding_step(&mut self, block_target: usize) {
-        log!(self.params, 1);
-        log!(self.params, 1, "Blockbuilding to {block_target}");
-
         let step = self.segments.next_step(); // TODO: bad
 
         let new_segments = self.do_step(|this, prev_segments| {
@@ -161,7 +149,7 @@ impl Solver {
                 };
                 let solutions_left_to_find =
                     desired_solution_count.saturating_sub(new_segments.len());
-                log!(this.params, 2, "Searching at depth {depth} ...");
+                overprint!("  Blockbuilding to {block_target} at depth {depth} ...");
 
                 new_segments.par_extend(
                     prev_segments
@@ -189,17 +177,21 @@ impl Solver {
 
                 if new_segments.len() >= desired_solution_count {
                     break;
-                } else if !new_segments.is_empty() {
-                    log!(
-                        this.params,
-                        3,
-                        "Found {} solutions; continuing ...",
-                        new_segments.len(),
-                    );
                 }
             }
             new_segments
         });
+
+        let min_twist_count = new_segments
+            .iter()
+            .map(|s| s.total_twist_count)
+            .min()
+            .unwrap_or(0);
+        overprintln!(
+            "  Blockbuilt to {block_target} ({} solutions; best is {} ETM)",
+            new_segments.len(),
+            min_twist_count,
+        );
 
         self.segments.add_segments(step, new_segments);
     }

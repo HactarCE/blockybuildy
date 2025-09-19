@@ -4,24 +4,27 @@ use itertools::Itertools;
 use robodoan::*;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let profile = Profile::Fast;
+
     if let Some(filename) = std::env::args().nth(1) {
         let log_file_text = std::fs::read_to_string(&filename)?;
         let scramble: mc4d::Mc4dScramble = log_file_text.parse()?;
         println!("Loaded log file from {filename}");
         println!();
         // let (solve_twists, _elapsed_time) = search_4d(scramble.scramble());
-        let solve_twists = robodoan::Solver::new(scramble.scramble()).solve();
+        let solve_twists = robodoan::Solver::new(profile, scramble.scramble()).solve();
         println!();
         std::fs::write("out.log", scramble.to_string(false, solve_twists))?;
         return Ok(());
     }
 
     let mut results = vec![];
-    for i in 0..10 {
+    for i in 0..1 {
         let scramble = RUBIKS_4D.random_moves(&mut rand::rng(), 100);
         println!("\n\n---- STARTING SEARCH #{} ----\n", i + 1);
+        println!("Scramble: {}", scramble.iter().join(" "));
         let t = std::time::Instant::now();
-        let solution = robodoan::Solver::new(scramble).solve();
+        let solution = robodoan::Solver::new(profile, scramble).solve();
         results.push((solution.len(), t.elapsed()));
     }
     println!("\n\n---- RESULTS ----\n");

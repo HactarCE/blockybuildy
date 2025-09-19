@@ -13,3 +13,17 @@ macro_rules! log {
         }
     };
 }
+
+macro_rules! overprint {
+    ($($args:tt)*) => {
+        print!("\r");
+        print!($($args)*);
+        ::std::io::Write::flush(&mut ::std::io::stdout()).unwrap();
+    };
+}
+macro_rules! overprintln {
+    ($($args:tt)*) => {
+        print!("\r");
+        println!($($args)*);
+    };
+}
