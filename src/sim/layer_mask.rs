@@ -4,7 +4,6 @@ use std::ops::{BitAnd, BitOr, BitXor, Mul};
 use super::elements::*;
 use super::grip_set::GripSet;
 use super::grips::*;
-use crate::StackVec;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum GripStatus {
@@ -96,35 +95,32 @@ impl PackedLayers {
 
     /// Returns a bitmask of axes along which at least one grip is blocked.
     #[inline]
-    pub const fn blocked_axes_mask(self) -> u8 {
-        self.is_axis_blocked(0) as u8
-            | (self.is_axis_blocked(1) as u8) << 1
-            | (self.is_axis_blocked(2) as u8) << 2
-            | (self.is_axis_blocked(3) as u8) << 3
+    pub const fn blocked_axes_mask(self) -> u16 {
+        let bits = self.to_u16();
+        (bits | (bits >> 2)) & 0b_0001_0001_0001_0001
     }
     #[inline]
-    pub fn indistinguishable_subgroup(self) -> Option<StackVec<ElemId, 24>> {
+    pub fn indistinguishable_subgroup(self) -> Option<&'static [ElemId]> {
         let blocked_axes_mask = self.blocked_axes_mask();
-        if blocked_axes_mask.count_ones() == 1 {
-            StackVec::from_slice(&match blocked_axes_mask {
-                0b0001 => *X_STABILIZER,
-                0b0010 => *Y_STABILIZER,
-                0b0100 => *Z_STABILIZER,
-                0b1000 => *W_STABILIZER,
+        let num_blocked_axes = blocked_axes_mask.count_ones();
+        match num_blocked_axes {
+            1 => Some(match blocked_axes_mask {
+                0b_0000_0000_0000_0001 => X_STABILIZER.as_slice(),
+                0b_0000_0000_0001_0000 => Y_STABILIZER.as_slice(),
+                0b_0000_0001_0000_0000 => Z_STABILIZER.as_slice(),
+                0b_0001_0000_0000_0000 => W_STABILIZER.as_slice(),
                 _ => return None,
-            })
-        } else if blocked_axes_mask.count_ones() == 2 {
-            StackVec::from_slice(&match blocked_axes_mask {
-                0b0011 => *XY_STABILIZER,
-                0b0101 => *XZ_STABILIZER,
-                0b1001 => *XW_STABILIZER,
-                0b0110 => *YZ_STABILIZER,
-                0b1010 => *YW_STABILIZER,
-                0b1100 => *ZW_STABILIZER,
+            }),
+            2 => Some(match blocked_axes_mask {
+                0b_0000_0000_0001_0001 => XY_STABILIZER.as_slice(),
+                0b_0000_0001_0000_0001 => XZ_STABILIZER.as_slice(),
+                0b_0001_0000_0000_0001 => XW_STABILIZER.as_slice(),
+                0b_0000_0001_0001_0000 => YZ_STABILIZER.as_slice(),
+                0b_0001_0000_0001_0000 => YW_STABILIZER.as_slice(),
+                0b_0001_0001_0000_0000 => ZW_STABILIZER.as_slice(),
                 _ => return None,
-            })
-        } else {
-            None
+            }),
+            _ => None,
         }
     }
     /// Returns `[inside, outside]`

@@ -276,14 +276,13 @@ impl Block {
     /// - In 4D, only centers and ridges has indistinguishable attitudes.
     ///
     /// The core's attitude is always completely distinguishable.
-    pub fn indistinguishable_attitudes(self, ndim: usize) -> StackVec<ElemId, 24> {
-        if ndim == 3 && self.layers == PackedLayers::CORE_3D {
-            return StackVec::from_iter([self.attitude]).unwrap(); // 3D core is distinguishable
-        }
+    pub fn indistinguishable_attitudes(&self, ndim: usize) -> impl Iterator<Item = ElemId> {
         self.layers
             .indistinguishable_subgroup()
-            .map(|subgroup| subgroup.map(|rot| rot * self.attitude))
-            .unwrap_or_else(|| StackVec::from_iter([self.attitude]).unwrap())
+            .filter(|_| !(ndim == 3 && self.layers == PackedLayers::CORE_3D)) // 3D core is distinguishable
+            .unwrap_or(&[IDENT])
+            .iter()
+            .map(|&rot| rot * self.attitude)
     }
     /// Returns the set of grips constructed by taking all indistinguishable
     /// attitudes for the block in its current position and mutliplying each one
@@ -339,7 +338,7 @@ impl Block {
 
         if !body
             .indistinguishable_attitudes(ndim)
-            .contains(&head.attitude)
+            .any(|a| a == head.attitude)
         {
             return None;
         }
@@ -380,6 +379,7 @@ impl Mul<Block> for Twist {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use proptest::prelude::*;
 
     use super::*;
@@ -422,13 +422,13 @@ mod tests {
         assert!(!b1.layers.is_empty_on_any_axis());
         assert!(!b2.layers.is_empty_on_any_axis());
 
-        let mut b1_attitudes = b1.indistinguishable_attitudes(ndim);
-        let b2_attitudes = b2.indistinguishable_attitudes(ndim);
+        let mut b1_attitudes = b1.indistinguishable_attitudes(ndim).collect_vec();
+        let b2_attitudes = b2.indistinguishable_attitudes(ndim).collect_vec();
         if !b1_attitudes.iter().any(|a| b2_attitudes.contains(a)) {
             assert_eq!(None, b1.try_merge(b2, ndim));
             assert_eq!(None, b2.try_merge(b1, ndim)); // commutativity
             b1.attitude = b2.attitude;
-            b1_attitudes = b1.indistinguishable_attitudes(ndim);
+            b1_attitudes = b1.indistinguishable_attitudes(ndim).collect();
         }
 
         let layers1 = b1.layers.unpack();
@@ -477,7 +477,7 @@ mod tests {
     #[test]
     fn test_block_indistinguishable_attitudes() {
         fn count(b: Block, ndim: usize) -> usize {
-            b.indistinguishable_attitudes(ndim).len()
+            b.indistinguishable_attitudes(ndim).count()
         }
 
         // 4D

@@ -77,9 +77,9 @@ impl Heuristic {
                     };
 
                     let head_attitude = head.attitude();
-                    let body_attitudes = body.indistinguishable_attitudes(ndim);
+                    let mut body_attitudes = body.indistinguishable_attitudes(ndim);
                     debug_assert!(
-                        !body_attitudes.contains(&head_attitude),
+                        !body_attitudes.any(|a| a == head_attitude),
                         "should already be merged",
                     );
 
