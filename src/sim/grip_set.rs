@@ -336,6 +336,8 @@ impl Block {
             [other, self]
         };
 
+        let layers = self.layers.try_merge_with(other.layers)?.0;
+
         if !body
             .indistinguishable_attitudes(ndim)
             .any(|a| a == head.attitude)
@@ -344,7 +346,7 @@ impl Block {
         }
 
         Some(Self {
-            layers: self.layers.try_merge_with(other.layers)?.0,
+            layers,
             attitude: head.attitude,
         })
     }
