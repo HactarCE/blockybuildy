@@ -113,10 +113,10 @@ I'm writing this program to give the computer-assisted category some much-needed
 
 ## Optimizations (to-do)
 
-- [ ] search multiple routes at once / meta search over block extensions
+- [x] search multiple routes at once / meta search over block extensions
 - [ ] consider other representations of rotations that can use smaller LUTs
 - [x] don't move the same grip twice within one search
-- [ ] make supercenters optional (and superridges in 4D)
+- [x] indistinguishable attitudes
 - [x] prune based on optimistic block formation heuristics
 - [x] dynamically adjust goal (may be redundant with pruning)
 - [ ] NISS

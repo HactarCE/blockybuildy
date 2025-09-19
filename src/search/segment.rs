@@ -27,7 +27,7 @@ impl SolutionSegment {
     #[must_use]
     pub fn push_twist(&self, twist: Twist, last_grip: Option<GripId>) -> Option<Self> {
         Some(Self {
-            state: self.state.do_twist(twist)?,
+            state: self.state.do_twist(twist, 4)?, // 4D
             segment_twists: self.segment_twists.push(twist)?,
             previous_segment_index: self.previous_segment_index,
             total_twist_count: self.total_twist_count + (last_grip != Some(twist.grip)) as usize,

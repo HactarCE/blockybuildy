@@ -99,11 +99,11 @@ impl Solver {
         self.do_blockbuilding_stage(1, |meta| meta.stage3());
         log!(self.params);
 
-        log!(self.params, 0, "STAGE 4: right (mid + left), 2x2x2x1 block");
+        log!(self.params, 0, "STAGE 4: right (mid + back), 2x2x2x1 block");
         self.do_blockbuilding_stage(2, |meta| meta.stage4());
         log!(self.params);
 
-        log!(self.params, 0, "STAGE 5: right (mid + left), 2x2x3x1 block");
+        log!(self.params, 0, "STAGE 5: right (mid + back), 2x2x3x1 block");
         self.do_blockbuilding_stage(2, |meta| meta.stage5());
         log!(self.params);
 
@@ -269,7 +269,7 @@ pub fn dfs_blockbuild(
 
     if !params
         .heuristic
-        .might_be_solvable(state, expected_blocks, remaining_depth)
+        .might_be_solvable(puzzle, state, expected_blocks, remaining_depth)
     {
         return; // probably not solvable; give up
     }
@@ -290,7 +290,7 @@ pub fn dfs_blockbuild(
         if last_grip == Some(grip.id.opposite()) && second_to_last_grip == Some(grip.id) {
             return false; // opposite grip already moved
         }
-        if combined_layer_mask.grip_status(grip.id) == Some(GripStatus::Inactive) {
+        if combined_layer_mask.grip_status(grip.id) == GripStatus::Inactive {
             return false; // doesn't move any block
         }
         // TODO: don't check opposite if it was 2nd-to-last move

@@ -24,10 +24,12 @@ impl PackedLayers {
     pub const CORE_4D: Self = Self::from_u16(0b_0010_0010_0010_0010);
     pub const ALL: Self = Self::from_u16(0b_0111_0111_0111_0111);
 
+    #[inline]
     const fn to_u16(self) -> u16 {
         u16::from_ne_bytes(self.0)
     }
-    const fn from_u16(i: u16) -> Self {
+    #[inline]
+    pub(crate) const fn from_u16(i: u16) -> Self {
         Self(i.to_ne_bytes())
     }
 
@@ -44,7 +46,7 @@ impl PackedLayers {
         Self::from_u16(
             self.to_u16()
                 | match self.grip_status(g.opposite()) {
-                    Some(GripStatus::Active) => inactive_grip_mask(g.opposite()),
+                    GripStatus::Active => inactive_grip_mask(g.opposite()),
                     _ => active_grip_mask(g),
                 },
         )
@@ -67,6 +69,10 @@ impl PackedLayers {
     pub const fn is_fully_blocked_on_axis(self, axis: usize) -> bool {
         self.bits_for_axis(axis) == 0b111
     }
+    #[inline]
+    pub fn has_middle_slice_on_axis(self, axis: usize) -> bool {
+        (self.to_u16() >> (axis * 4) & 0b010) != 0
+    }
 
     #[inline]
     const fn bits_for_axis(self, axis: usize) -> u8 {
@@ -88,13 +94,17 @@ impl PackedLayers {
         if g.id() & 1 == 0 { bits } else { rev3(bits) }
     }
 
+    /// Returns a bitmask of axes along which at least one grip is blocked.
+    #[inline]
+    pub const fn blocked_axes_mask(self) -> u8 {
+        self.is_axis_blocked(0) as u8
+            | (self.is_axis_blocked(1) as u8) << 1
+            | (self.is_axis_blocked(2) as u8) << 2
+            | (self.is_axis_blocked(3) as u8) << 3
+    }
+    #[inline]
     pub fn indistinguishable_subgroup(self) -> Option<StackVec<ElemId, 24>> {
-        let blocked_axes_mask = {
-            self.is_axis_blocked(0) as u8
-                | (self.is_axis_blocked(1) as u8) << 1
-                | (self.is_axis_blocked(2) as u8) << 2
-                | (self.is_axis_blocked(3) as u8) << 3
-        };
+        let blocked_axes_mask = self.blocked_axes_mask();
         if blocked_axes_mask.count_ones() == 1 {
             StackVec::from_slice(&match blocked_axes_mask {
                 0b0001 => *X_STABILIZER,
@@ -130,8 +140,10 @@ impl PackedLayers {
         self.to_u16() & !other.to_u16() == 0
     }
 
+    /// Merges the blocks if possible. Returns the merged block and the axis
+    /// along which they were merged.
     #[must_use]
-    pub fn try_merge_with(self, other: Self) -> Option<(Self, GripId)> {
+    pub fn try_merge_with(self, other: Self) -> Option<(Self, usize)> {
         if self == other {
             return None; // same blocks
         }
@@ -139,28 +151,25 @@ impl PackedLayers {
         let lhs = self.to_u16();
         let rhs = other.to_u16();
         let layer_difference = lhs ^ rhs;
-        let merge_grip = GripId::try_new(
-            (layer_difference & 0b_0101_0101_0101_0101).trailing_zeros() as u8 / 2,
-        )?;
         let merge_axis = layer_difference.trailing_zeros() as usize / 4;
+        debug_assert!(merge_axis < 4); // otherwise they'd be the same blocks
 
-        let mut lhs_bits = lhs >> (merge_axis * 4);
-        let mut rhs_bits = rhs >> (merge_axis * 4);
-        if lhs_bits ^ rhs_bits > 0b111 {
+        if layer_difference & !(0b111 << merge_axis * 4) != 0 {
             return None; // multiple axes have different layers
         }
-        lhs_bits &= 0b111;
-        rhs_bits &= 0b111;
 
-        if lhs_bits & rhs_bits != 0 {
+        let lhs_axis_bits = self.bits_for_axis(merge_axis);
+        let rhs_axis_bits = other.bits_for_axis(merge_axis);
+
+        if lhs_axis_bits & rhs_axis_bits != 0 {
             return None; // `self` and `other` overlap
         }
 
-        if lhs_bits | rhs_bits == 0b101 {
+        if lhs_axis_bits | rhs_axis_bits == 0b101 {
             return None; // disconnected blocks not allowed (but they could be, if we had slice moves)
         }
 
-        Some((self | other, merge_grip))
+        Some((self | other, merge_axis))
     }
 
     /// Returns the positive grips on the separating axes of the blocks.
@@ -175,13 +184,25 @@ impl PackedLayers {
         ret
     }
 
+    /// Returns the number of active grips the block has.
+    #[inline]
+    pub const fn active_grip_count(self) -> u32 {
+        let bits = self.to_u16();
+        let pos_bits = bits & 0b_0001_0001_0001_0001;
+        let mid_bits = bits & 0b_0010_0010_0010_0010;
+        let neg_bits = bits & 0b_0100_0100_0100_0100;
+        let pos_grips_active = pos_bits & (!mid_bits >> 1);
+        let neg_grips_active = neg_bits & (!mid_bits << 1);
+        (pos_grips_active | neg_grips_active).count_ones()
+    }
+
     /// Returns the status of a grip, or `None` if the layer mask is invalid.
-    pub const fn grip_status(self, g: GripId) -> Option<GripStatus> {
+    pub const fn grip_status(self, g: GripId) -> GripStatus {
         match self.bits_for_grip(g) {
-            0b001 => Some(GripStatus::Active),
-            0b011 | 0b111 => Some(GripStatus::Blocked),
-            0b110 | 0b100 | 0b010 => Some(GripStatus::Inactive),
-            _ => None,
+            0b001 => GripStatus::Active,
+            0b011 | 0b111 => GripStatus::Blocked,
+            0b110 | 0b100 | 0b010 => GripStatus::Inactive,
+            _ => panic!("invalid block"),
         }
     }
 
@@ -218,10 +239,10 @@ impl fmt::Display for PackedLayers {
         let mut inactive = GripSet::NONE;
         for g in HYPERCUBE_GRIPS {
             match self.grip_status(g) {
-                Some(GripStatus::Active) => active += g,
-                Some(GripStatus::Blocked) => blocked += g,
-                Some(GripStatus::Inactive) => inactive += g,
-                None => return write!(f, "bad_mask_{:#b}", self.to_u16()),
+                GripStatus::Active => active += g,
+                GripStatus::Blocked => blocked += g,
+                GripStatus::Inactive => inactive += g,
+                // None => return write!(f, "bad_mask_{:#b}", self.to_u16()),
             }
         }
         write!(f, "{active}${blocked:#}!{inactive}")
@@ -256,18 +277,10 @@ impl Mul<PackedLayers> for ElemId {
     type Output = PackedLayers;
 
     fn mul(self, rhs: PackedLayers) -> Self::Output {
+        let inv = self.inv();
         let mut resulting_bits = 0_u16;
-        for axis in 0..4 {
-            let old_grip = GripId::new(axis << 1);
-            let new_grip = self * old_grip;
-            let old_axis_bits = rhs.bits_for_axis(axis as usize);
-            let new_axis_bits = if new_grip.id() & 1 == 0 {
-                old_axis_bits
-            } else {
-                rev3(old_axis_bits)
-            };
-            let new_axis = new_grip.axis();
-            resulting_bits |= (new_axis_bits as u16) << (new_axis * 4);
+        for g in [R, U, F, O] {
+            resulting_bits |= (rhs.bits_for_grip(inv * g) as u16) << (g.axis() * 4);
         }
         PackedLayers::from_u16(resulting_bits)
     }
@@ -280,6 +293,9 @@ const fn rev3(x: u8) -> u8 {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+    use proptest::prelude::*;
+
     use super::*;
     use crate::{HYPERCUBE_ROTATIONS, IDENT};
 
@@ -292,5 +308,45 @@ mod tests {
                 assert_eq!(t1 * (t2 * layers), (t1 * t2) * layers);
             }
         }
+    }
+
+    proptest! {
+        #[test]
+        fn proptest_merge_layers(xs in prop::array::uniform8(0..6_usize)) {
+            test_merge_layers(xs)
+        }
+    }
+
+    fn test_merge_layers(xs: [usize; 8]) {
+        let axis_options = [0b001, 0b010, 0b100, 0b011, 0b110, 0b111];
+        let l1 = PackedLayers::from_u16(
+            axis_options[xs[0]]
+                | (axis_options[xs[0]] << 4)
+                | (axis_options[xs[1]] << 8)
+                | (axis_options[xs[2]] << 12),
+        );
+        let l2 = PackedLayers::from_u16(
+            axis_options[xs[4]]
+                | (axis_options[xs[5]] << 4)
+                | (axis_options[xs[6]] << 8)
+                | (axis_options[xs[7]] << 12),
+        );
+
+        let merge_axis = (0..4)
+            .filter(|&axis| l1.bits_for_axis(axis) != l2.bits_for_axis(axis))
+            .exactly_one()
+            .ok();
+
+        let merge_grip = merge_axis.and_then(|axis| {
+            GripId::pair_on_axis(axis).into_iter().find(|&g| {
+                (l1.bits_for_grip(g) == 0b001 && l2.bits_for_grip(g) & 0b011 == 0b010)
+                    || (l2.bits_for_grip(g) == 0b001 && l1.bits_for_grip(g) & 0b011 == 0b010)
+            })
+        });
+
+        let expected = merge_grip.map(|g| (l1 | l2, g.axis()));
+        let actual = l1.try_merge_with(l2);
+
+        assert_eq!(expected, actual);
     }
 }

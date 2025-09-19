@@ -2,10 +2,12 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use rand_pcg::Pcg64Mcg;
 use robodoan::*;
 
+const NDIM: usize = 4;
+
 fn exec_moves(init_state: PuzzleState, twists: &[Twist]) -> PuzzleState {
-    twists
-        .iter()
-        .fold(init_state, |state, &twist| state.do_twist(twist).unwrap())
+    twists.iter().fold(init_state, |state, &twist| {
+        state.do_twist(twist, NDIM).unwrap()
+    })
 }
 
 fn do_and_undo(twists: Vec<Twist>) -> Vec<Twist> {

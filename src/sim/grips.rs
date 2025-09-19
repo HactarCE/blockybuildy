@@ -40,6 +40,7 @@ impl GripId {
         if self.0 & 1 == 0 { 1 } else { -1 }
     }
 
+    #[inline]
     pub const fn pair_on_axis(axis: usize) -> [Self; 2] {
         assert!(axis < 4, "axis out of range");
         let g1 = Self::new((axis as u8) << 1);

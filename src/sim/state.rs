@@ -20,16 +20,35 @@ impl PuzzleState {
     /// Returns `None` if the twist failed because there are too many blocks to
     /// track.
     #[must_use]
-    pub fn do_twist(self, twist: Twist) -> Option<Self> {
+    pub fn do_twist(self, twist: Twist, ndim: usize) -> Option<Self> {
         let new_blocks = StackVec::<Block, { crate::MAX_BLOCKS }>::from_iter(
             self.blocks
                 .into_iter()
                 .flat_map(|block| twist * block)
                 .flatten(), // Option<T> -> T
-        )?
-        .sorted_unstable_by_key(|b| b.attitude());
+        )?;
 
-        Self::from_blocks(new_blocks)
+        Some(Self { blocks: new_blocks }.merge_blocks(ndim))
+    }
+
+    #[must_use]
+    fn merge_blocks(mut self, ndim: usize) -> Self {
+        loop {
+            let mut merged_blocks = StackVec::new();
+            'b1: for b1 in self.blocks {
+                for b2 in &mut merged_blocks {
+                    if let Some(merged) = b1.try_merge(*b2, ndim) {
+                        *b2 = merged; // replace with merged block
+                        continue 'b1;
+                    }
+                }
+                merged_blocks = merged_blocks.push(b1).unwrap();
+            }
+            if self.blocks.len() == merged_blocks.len() {
+                return self;
+            }
+            self.blocks = merged_blocks;
+        }
     }
 
     /// Constructs a state containing the given blocks and combines blocks as
@@ -38,35 +57,8 @@ impl PuzzleState {
     /// TODO: it may be possible for this to get an "N-perm situation" which
     /// would be bad.
     #[must_use]
-    fn from_blocks(blocks_iter: impl IntoIterator<Item = Block>) -> Option<Self> {
-        let mut ret = Self::default();
-        let mut merge_candidates = StackVec::<Block, { crate::MAX_BLOCKS }>::new();
-        for mut new_block in blocks_iter {
-            'merge_loop: loop {
-                for i in 0..merge_candidates.len() {
-                    if let Some(merged_block) = new_block.try_merge(merge_candidates[i]) {
-                        new_block = merged_block;
-                        merge_candidates = merge_candidates.swap_remove(i);
-                        continue 'merge_loop;
-                    }
-                }
-                break 'merge_loop;
-            }
-
-            if merge_candidates
-                .first()
-                .is_some_and(|m| m.attitude() != new_block.attitude())
-            {
-                ret.blocks = ret.blocks.extend(merge_candidates)?;
-                merge_candidates = StackVec::new();
-            }
-
-            merge_candidates = merge_candidates.push(new_block)?;
-        }
-
-        ret.blocks = ret.blocks.extend(merge_candidates)?;
-
-        Some(ret)
+    fn from_blocks(blocks: StackVec<Block, { crate::MAX_BLOCKS }>, ndim: usize) -> Self {
+        Self { blocks }.merge_blocks(ndim)
     }
 
     pub fn is_solved(self) -> bool {
@@ -112,10 +104,11 @@ impl PuzzleState {
 
         let init_piece = |new_piece| setup_moves.iter().fold(new_piece, |p, &twist| twist * p);
 
-        Self::from_blocks(
+        Some(Self::from_blocks(
             self.blocks
                 .extend(new_pieces.into_iter().map(init_piece).map(Block::from))?,
-        )
+            puzzle.ndim,
+        ))
     }
 }
 impl fmt::Display for PuzzleState {
@@ -142,11 +135,14 @@ mod tests {
             (true, "R R'"),
             (true, "D D'"),
             (true, "R L R' L'"),
-            (true, "F R U R' U' F'"),                    // fruruf
-            (true, "R U R' U' R' F R F'"),               // sexy sledgehammer
-            (true, "R U R' F' R U R' U' R' F R2 U' R'"), // J perm
-            (true, "R U R' U R' U' R2 U' R' U R' U R"),  // U perm
+            (true, "F R U R' U' F'"),                       // fruruf
+            (true, "R U R' U' R' F R F'"),                  // sexy sledgehammer
+            (true, "R U R' F' R U R' U' R' F R2 U' R'"),    // J perm
+            (true, "R U R' U R' U' R2 U' R' U R' U R"),     // U perm
+            (true, "R U R' U' R' F R2 U' R' U' R U R' F'"), // T perm
         ];
+
+        let ndim = 3;
 
         for (should_be_solved, last_layer_twist_seq) in last_layer_algs {
             let mut state = PuzzleState {
@@ -156,7 +152,7 @@ mod tests {
                 .split_ascii_whitespace()
                 .map(|s| twists::TWISTS_FROM_NAME[s])
             {
-                state = state.do_twist(t).unwrap();
+                state = state.do_twist(t, ndim).unwrap();
             }
             assert_eq!(should_be_solved, state.is_solved());
         }

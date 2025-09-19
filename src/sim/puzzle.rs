@@ -10,13 +10,16 @@ use super::twists::Twist;
 
 /// 3x3x3x3 facet-turning twisty puzzle.
 #[static_init::dynamic]
-pub static RUBIKS_4D: Puzzle = Puzzle::new(HYPERCUBE_GRIPS, &*HYPERCUBE_ROTATIONS);
+pub static RUBIKS_4D: Puzzle = Puzzle::new(4, HYPERCUBE_GRIPS, &*HYPERCUBE_ROTATIONS);
 
 /// 3x3x3 face-turning twisty puzzle.
 #[static_init::dynamic]
-pub static RUBIKS_3D: Puzzle = Puzzle::new(CUBE_GRIPS, &*CUBE_ROTATIONS);
+pub static RUBIKS_3D: Puzzle = Puzzle::new(3, CUBE_GRIPS, &*CUBE_ROTATIONS);
 
 pub struct Puzzle {
+    /// Number of dimensions, which is used to determine indistinguishable
+    /// attitudes.
+    pub ndim: usize,
     /// List of grips. Each contains the list of twists that are available on
     /// that grip.
     pub grips: Vec<GripData>,
@@ -25,7 +28,7 @@ pub struct Puzzle {
     pub twists: Vec<Twist>,
 }
 impl Puzzle {
-    pub fn new(grips: impl IntoIterator<Item = GripId>, group: &[ElemId]) -> Self {
+    pub fn new(ndim: usize, grips: impl IntoIterator<Item = GripId>, group: &[ElemId]) -> Self {
         let grips = grips
             .into_iter()
             .map(|id| GripData {
@@ -44,7 +47,11 @@ impl Puzzle {
             })
             .collect_vec();
 
-        Self { grips, twists }
+        Self {
+            ndim,
+            grips,
+            twists,
+        }
     }
 
     pub fn grip_set(&self) -> GripSet {

@@ -212,7 +212,7 @@ impl Block {
         self.attitude == other.attitude && self.layers.is_subset_of(other.layers)
     }
 
-    pub fn grip_status(self, grip: GripId) -> Option<GripStatus> {
+    pub fn grip_status(self, grip: GripId) -> GripStatus {
         self.layers.grip_status(grip)
     }
 
@@ -231,7 +231,7 @@ impl Block {
     fn grips_with_status(self, status: GripStatus) -> GripSet {
         HYPERCUBE_GRIPS
             .into_iter()
-            .filter(|&g| self.layers.grip_status(g) == Some(status))
+            .filter(|&g| self.layers.grip_status(g) == status)
             .collect()
     }
 
@@ -264,7 +264,7 @@ impl Block {
             } else {
                 GripStatus::Active
             };
-            self.layers.grip_status(g) != Some(forbidden_status)
+            self.layers.grip_status(g) != forbidden_status
         })
     }
 
@@ -277,15 +277,48 @@ impl Block {
     ///
     /// The core's attitude is always completely distinguishable.
     #[must_use]
-    pub fn indistinguishable_attitudes(self, ndim: usize) -> Option<StackVec<ElemId, 24>> {
-        const CORE_3D: PackedLayers = PackedLayers::CORE_3D;
-
-        if ndim == 3 && self.layers == CORE_3D {
-            return None; // 3D core is distinguishable
+    pub fn indistinguishable_attitudes(self, ndim: usize) -> StackVec<ElemId, 24> {
+        if ndim == 3 && self.layers == PackedLayers::CORE_3D {
+            return StackVec::from_iter([self.attitude]).unwrap(); // 3D core is distinguishable
         }
         self.layers
             .indistinguishable_subgroup()
             .map(|subgroup| subgroup.map(|rot| rot * self.attitude))
+            .unwrap_or_else(|| StackVec::from_iter([self.attitude]).unwrap())
+    }
+    /// Returns the set of grips constructed by taking all indistinguishable
+    /// attitudes for the block in its current position and mutliplying each one
+    /// by `g`. Duplicates are not included.
+    pub fn mul_indistinguishable_attides_by_grip(
+        self,
+        ndim: usize,
+        g: GripId,
+    ) -> StackVec<GripId, 6> {
+        let g = self.attitude * g;
+        let only_g = || StackVec::from_iter([g]).unwrap();
+
+        // Core is always distinguishable
+        if (ndim == 3 && self.layers == PackedLayers::CORE_3D)
+            || self.layers == PackedLayers::CORE_4D
+        {
+            return only_g();
+        }
+
+        if self.layers.is_axis_blocked(g.axis()) {
+            return only_g();
+        }
+
+        let blocked_axes_mask = self.layers.blocked_axes_mask();
+        if blocked_axes_mask.count_ones() > 2 {
+            return only_g();
+        }
+
+        StackVec::from_iter(
+            (0..4)
+                .filter(|i| (blocked_axes_mask >> i) & 1 != 0)
+                .flat_map(GripId::pair_on_axis),
+        )
+        .unwrap()
     }
 
     //// Returns `[inside, outside]`
@@ -298,14 +331,23 @@ impl Block {
         })
     }
 
-    pub fn try_merge(self, other: Self) -> Option<Self> {
-        if self.attitude != other.attitude {
+    pub fn try_merge(self, other: Self, ndim: usize) -> Option<Self> {
+        let [head, body] = if self.layers.active_grip_count() > other.layers.active_grip_count() {
+            [self, other]
+        } else {
+            [other, self]
+        };
+
+        if !body
+            .indistinguishable_attitudes(ndim)
+            .contains(&head.attitude)
+        {
             return None;
         }
 
         Some(Self {
             layers: self.layers.try_merge_with(other.layers)?.0,
-            attitude: self.attitude,
+            attitude: head.attitude,
         })
     }
 }
@@ -376,22 +418,22 @@ mod tests {
     }
 
     fn test_merge_blocks(mut b1: Block, b2: Block) {
+        let ndim = 4;
+
         assert!(!b1.layers.is_empty_on_any_axis());
         assert!(!b2.layers.is_empty_on_any_axis());
 
-        if b1.attitude != b2.attitude {
-            assert_eq!(None, b1.try_merge(b2));
-            assert_eq!(None, b2.try_merge(b1)); // commutativity
+        let mut b1_attitudes = b1.indistinguishable_attitudes(ndim);
+        let b2_attitudes = b2.indistinguishable_attitudes(ndim);
+        if !b1_attitudes.iter().any(|a| b2_attitudes.contains(a)) {
+            assert_eq!(None, b1.try_merge(b2, ndim));
+            assert_eq!(None, b2.try_merge(b1, ndim)); // commutativity
             b1.attitude = b2.attitude;
+            b1_attitudes = b1.indistinguishable_attitudes(ndim);
         }
 
         let layers1 = b1.layers.unpack();
         let layers2 = b2.layers.unpack();
-
-        let possible_merged_block = Block {
-            layers: b1.layers | b2.layers,
-            attitude: b1.attitude,
-        };
 
         let mut num_same_axes = 0;
         let mut num_mergeable_axes = 0;
@@ -402,8 +444,8 @@ mod tests {
             num_mergeable_axes += disjoint as usize;
         }
 
-        let actual_merged = b1.try_merge(b2);
-        assert_eq!(actual_merged, b2.try_merge(b1)); // commutativity
+        let actual_merged = b1.try_merge(b2, ndim);
+        assert_eq!(actual_merged, b2.try_merge(b1, ndim)); // commutativity
 
         assert_eq!(
             num_same_axes == 3 && num_mergeable_axes == 1,
@@ -411,7 +453,9 @@ mod tests {
         );
 
         if let Some(m) = actual_merged {
-            assert_eq!(m, possible_merged_block);
+            assert_eq!(b1.layers | b2.layers, m.layers);
+            assert!(b1_attitudes.contains(&m.attitude));
+            assert!(b2_attitudes.contains(&m.attitude));
         }
     }
 
@@ -434,10 +478,7 @@ mod tests {
     #[test]
     fn test_block_indistinguishable_attitudes() {
         fn count(b: Block, ndim: usize) -> usize {
-            match b.indistinguishable_attitudes(ndim) {
-                Some(subgroup) => subgroup.len(),
-                None => 1,
-            }
+            b.indistinguishable_attitudes(ndim).len()
         }
 
         // 4D
