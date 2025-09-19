@@ -330,13 +330,13 @@ impl Block {
     }
 
     pub fn try_merge(self, other: Self, ndim: usize) -> Option<Self> {
+        let layers = self.layers.try_merge_with(other.layers)?.0;
+
         let [head, body] = if self.layers.active_grip_count() > other.layers.active_grip_count() {
             [self, other]
         } else {
             [other, self]
         };
-
-        let layers = self.layers.try_merge_with(other.layers)?.0;
 
         if !body
             .indistinguishable_attitudes(ndim)
