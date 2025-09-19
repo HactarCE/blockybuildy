@@ -1,3 +1,5 @@
+use std::sync::atomic::AtomicIsize;
+
 use itertools::Itertools;
 use rayon::prelude::*;
 
@@ -9,83 +11,34 @@ mod segment;
 pub use heuristic::Heuristic;
 use meta::SolutionMetadata;
 pub use params::BlockBuildingSearchParams;
-pub use segment::SolutionSegment;
+pub use segment::{Segment, SegmentId, SegmentStore};
 
+use crate::MAX_SOLUTION_COUNT;
 use crate::sim::*;
-use crate::{MAX_SOLUTION_COUNT, MIN_SOLUTION_COUNT};
 
 pub struct Solver {
     puzzle: &'static Puzzle,
     params: BlockBuildingSearchParams,
-    scramble: Vec<Twist>,
-    stages: Vec<Vec<SolutionSegment>>,
+    segments: SegmentStore,
 }
 impl Solver {
-    fn do_blockbuilding_stage<I: IntoIterator<Item = (Block, SolutionMetadata)>>(
-        &mut self,
-        target_block_count: usize,
-        make_target_blocks: impl Send + Sync + Fn(SolutionMetadata) -> I,
-    ) {
-        // Add pieces
-        log!(self.params);
-        log!(self.params, 1, "Adding pieces");
-        let new_segments = do_step(
-            self.params,
-            self.stages.last().unwrap(),
-            [()],
-            |()| {},
-            |(), init, solutions_buffer| {
-                for (new_block, new_meta) in make_target_blocks(init.meta) {
-                    let setup_moves =
-                        self.all_prior_twists_for_segment(init.previous_segment_index);
-                    if let Some(new_segment) =
-                        init.push_block(self.puzzle, &setup_moves, new_block, new_meta)
-                    {
-                        solutions_buffer.push(new_segment);
-                    }
-                }
-            },
-        );
-        log!(
-            self.params,
-            1,
-            "Done adding pieces: {} options",
-            new_segments.len()
-        );
-        self.stages.push(new_segments);
-
-        // Blockbuild
-        self.blockbuild_down_to(target_block_count);
-    }
-
-    fn blockbuild_down_to(&mut self, target_block_count: usize) {
-        let last_stage = self.stages.last().unwrap();
-        let worst_candidate_from_last_stage = last_stage.last().unwrap();
-        let init_blocks = worst_candidate_from_last_stage.state.blocks.len();
-        for target in (target_block_count..init_blocks).rev() {
-            do_step_blockbuilding(self.puzzle, self.params, &mut self.stages, target);
-            if self.stages.last().unwrap().is_empty() {
-                log!(self.params, 1, "No solutions! Backtracking ...");
-                self.stages.pop();
-            }
-        }
-    }
-
     pub fn new(scramble: impl Into<Vec<Twist>>) -> Self {
         Self {
             puzzle: &*RUBIKS_4D,
             params: BlockBuildingSearchParams {
                 heuristic: Heuristic::Fast,
                 max_depth: 4,
+                parallel_depth: 2,
                 verbosity: 5,
             },
-            scramble: scramble.into(),
-            stages: vec![vec![SolutionSegment::default()]],
+            segments: SegmentStore::new(scramble.into()),
         }
     }
 
     pub fn solve(mut self) -> Vec<Twist> {
         let start = std::time::Instant::now();
+
+        // Keep the call graph flat for recursion.
 
         log!(self.params, 0, "STAGE 1: mid + left, 2x2x2x2 block");
         self.do_blockbuilding_stage(1, |meta| meta.stage1());
@@ -99,11 +52,11 @@ impl Solver {
         self.do_blockbuilding_stage(1, |meta| meta.stage3());
         log!(self.params);
 
-        log!(self.params, 0, "STAGE 4: right (mid + back), 2x2x2x1 block");
+        log!(self.params, 0, "STAGE 4: right (mid + left), 2x2x2x1 block");
         self.do_blockbuilding_stage(2, |meta| meta.stage4());
         log!(self.params);
 
-        log!(self.params, 0, "STAGE 5: right (mid + back), 2x2x3x1 block");
+        log!(self.params, 0, "STAGE 5: right (mid + left), 2x2x3x1 block");
         self.do_blockbuilding_stage(2, |meta| meta.stage5());
         log!(self.params);
 
@@ -126,118 +79,182 @@ impl Solver {
         println!("Total elapsed time: {:?}", start.elapsed());
 
         println!();
+        let best_solution = self.segments.best_solution_so_far().unwrap();
+        println!("Best solution: {}", self.segments[best_solution]);
         println!(
-            "Best solution: {}",
-            self.stages.last().unwrap().first().unwrap()
+            "{}",
+            self.segments
+                .solution_twists_for_segment(best_solution)
+                .iter()
+                .join(" ")
         );
-        println!("{}", self.solution_twists_for_segment(0).iter().join(" "));
 
-        self.solution_twists_for_segment(0)
+        self.segments.solution_twists_for_segment(best_solution)
     }
 
-    fn solution_twists_for_segment(&self, segment_index: usize) -> Vec<Twist> {
-        self.twists_for_segment(&[], segment_index)
-    }
-    fn all_prior_twists_for_segment(&self, segment_index: usize) -> Vec<Twist> {
-        self.twists_for_segment(&self.scramble, segment_index)
-    }
-    fn twists_for_segment(&self, init: &[Twist], mut segment_index: usize) -> Vec<Twist> {
-        let mut reversed_twists = vec![];
-        for stage in self.stages.iter().rev() {
-            let segment = &stage[segment_index];
-            reversed_twists.extend(segment.segment_twists.into_iter().rev());
-            segment_index = segment.previous_segment_index;
+    fn do_blockbuilding_stage<I: IntoIterator<Item = (Block, SolutionMetadata)>>(
+        &mut self,
+        target_block_count: usize,
+        make_target_blocks: impl Send + Sync + Fn(SolutionMetadata) -> I,
+    ) {
+        let step = self.segments.next_step();
+
+        // Add pieces
+        log!(self.params);
+        log!(self.params, 1, "Adding pieces");
+        let new_segments = self.do_step(|this, prev_segments| {
+            prev_segments
+                .par_iter()
+                .flat_map(|&prev_segment_id| {
+                    let prev_segment = &this.segments[prev_segment_id];
+                    let mut results = vec![];
+                    for (new_block, new_meta) in make_target_blocks(prev_segment.meta) {
+                        let setup_moves =
+                            this.segments.all_prior_twists_for_segment(prev_segment_id);
+                        if let Some(new_segment) =
+                            prev_segment.push_block(this.puzzle, &setup_moves, new_block, new_meta)
+                        {
+                            results.push(new_segment);
+                        }
+                    }
+                    results
+                })
+                .collect()
+        });
+        log!(
+            self.params,
+            1,
+            "Done adding pieces: {} options",
+            new_segments.len()
+        );
+        let init_blocks = new_segments
+            .iter()
+            .map(|segment| segment.state.blocks.len())
+            .max()
+            .unwrap_or(0);
+        self.segments.add_segments(step, new_segments);
+
+        // Blockbuild
+        for target in (target_block_count..init_blocks).rev() {
+            self.do_blockbuilding_step(target);
+            // if self.steps.last().unwrap().is_empty() {
+            //     log!(self.params, 1, "No solutions! Giving up ...");
+            //     std::process::exit(1);
+            // }
         }
-        init.iter()
-            .chain(reversed_twists.iter().rev())
-            .copied()
-            .collect()
     }
-}
 
-fn do_step_blockbuilding(
-    puzzle: &Puzzle,
-    params: BlockBuildingSearchParams,
-    stages: &mut Vec<Vec<SolutionSegment>>,
-    block_target: usize,
-) {
-    log!(params, 1);
-    log!(params, 1, "Blockbuilding to {block_target}");
-    let new_segments = do_step(
-        params,
-        stages.last().unwrap(),
-        0..=params.max_depth,
-        |depth| log!(params, 2, "Searching at depth {depth} ..."),
-        |depth, segment, solutions_buffer| {
-            dfs_blockbuild(
-                params,
-                puzzle,
-                block_target,
-                depth,
-                solutions_buffer,
-                segment,
-            );
-        },
-    );
-    stages.push(new_segments);
-}
+    fn do_blockbuilding_step(&mut self, block_target: usize) {
+        log!(self.params, 1);
+        log!(self.params, 1, "Blockbuilding to {block_target}");
 
-#[must_use]
-fn do_step<O: Copy + Send + Sync>(
-    params: BlockBuildingSearchParams,
-    prev_stage: &[SolutionSegment],
-    search_options: impl IntoIterator<Item = O>,
-    mut print_fn: impl FnMut(O),
-    find_solution_segments: impl Send + Sync + Fn(O, SolutionSegment, &mut Vec<SolutionSegment>),
-) -> Vec<SolutionSegment> {
-    let t = std::time::Instant::now();
+        let step = self.segments.next_step(); // TODO: bad
 
-    let mut new_solution_segments = vec![];
-    for search_options in search_options {
-        print_fn(search_options);
-        new_solution_segments.par_extend(prev_stage.par_iter().enumerate().flat_map(
-            |(previous_segment_index, prev_segment)| {
-                let mut results = vec![];
-                find_solution_segments(
-                    search_options,
-                    prev_segment.next_stage(previous_segment_index),
-                    &mut results,
+        let new_segments = self.do_step(|this, prev_segments| {
+            let mut new_segments = vec![];
+            for depth in 0..=this.params.max_depth {
+                let desired_solution_count = match depth {
+                    ..=1 => crate::MIN_SOLUTION_COUNT_DEPTH_1,
+                    2 => crate::MIN_SOLUTION_COUNT_DEPTH_2,
+                    3 => crate::MIN_SOLUTION_COUNT_DEPTH_3,
+                    4.. => crate::MIN_SOLUTION_COUNT_DEPTH_4,
+                };
+                let solutions_left_to_find =
+                    desired_solution_count.saturating_sub(new_segments.len());
+                log!(this.params, 2, "Searching at depth {depth} ...");
+
+                new_segments.par_extend(
+                    prev_segments
+                        .par_iter()
+                        .flat_map(|&prev_segment| {
+                            let mut results = vec![];
+                            dfs_blockbuild(
+                                this.params,
+                                this.puzzle,
+                                block_target,
+                                depth,
+                                &mut results,
+                                this.segments[prev_segment].next_step(prev_segment),
+                                None,
+                                if depth > this.params.parallel_depth {
+                                    this.params.parallel_depth
+                                } else {
+                                    0
+                                },
+                            );
+                            results
+                        })
+                        .take_any(solutions_left_to_find),
                 );
-                results
-            },
-        ));
-        if new_solution_segments.len() >= MIN_SOLUTION_COUNT {
-            break;
-        } else if !new_solution_segments.is_empty() {
-            log!(
-                params,
-                3,
-                "Found {} solutions; continuing ...",
-                new_solution_segments.len(),
-            );
+
+                if new_segments.len() >= desired_solution_count {
+                    break;
+                } else if !new_segments.is_empty() {
+                    log!(
+                        this.params,
+                        3,
+                        "Found {} solutions; continuing ...",
+                        new_segments.len(),
+                    );
+                }
+            }
+            new_segments
+        });
+
+        self.segments.add_segments(step, new_segments);
+    }
+
+    #[must_use]
+    fn do_step(
+        &mut self,
+        continue_solutions: impl Send + Sync + FnOnce(&Self, &[SegmentId]) -> Vec<Segment>,
+    ) -> Vec<Segment> {
+        let t = std::time::Instant::now();
+
+        let step = self.segments.next_step(); // TODO: does not generalize
+        let last_step = step - 1;
+        let segments_to_search_from = self
+            .segments
+            .take_all_from_step(last_step)
+            .unwrap_or_default();
+
+        let mut new_solution_segments = continue_solutions(self, &segments_to_search_from);
+
+        new_solution_segments.sort();
+        new_solution_segments.dedup();
+
+        log!(
+            self.params,
+            2,
+            "Completed step in {:?} with {} solutions",
+            t.elapsed(),
+            new_solution_segments.len(),
+        );
+
+        if let Some(best) = new_solution_segments.first() {
+            log!(self.params, 3, "Best solution: {best}");
+            let twist_count_sums = new_solution_segments
+                .iter()
+                .map(|s| s.total_twist_count)
+                .counts()
+                .into_iter()
+                .sorted()
+                .map(|(len, count)| format!("{len}: {count}"))
+                .join(", ");
+            log!(self.params, 4, "By twist count: {{{twist_count_sums}}}");
         }
+
+        if new_solution_segments.len() > MAX_SOLUTION_COUNT {
+            log!(
+                self.params,
+                3,
+                "Truncating to {MAX_SOLUTION_COUNT} solutions"
+            );
+            new_solution_segments.truncate(MAX_SOLUTION_COUNT);
+        }
+
+        new_solution_segments
     }
-
-    log!(
-        params,
-        2,
-        "Completed step in {:?} with {} solutions",
-        t.elapsed(),
-        new_solution_segments.len(),
-    );
-
-    new_solution_segments.sort();
-
-    if let Some(best) = new_solution_segments.first() {
-        log!(params, 3, "Best solution: {best}");
-    }
-
-    if new_solution_segments.len() > MAX_SOLUTION_COUNT {
-        log!(params, 3, "Truncating to {MAX_SOLUTION_COUNT} solutions");
-        new_solution_segments.truncate(MAX_SOLUTION_COUNT);
-    }
-
-    new_solution_segments
 }
 
 /// Runs a depth-first search to `remaining_depth` for sequences of moves that
@@ -249,10 +266,12 @@ pub fn dfs_blockbuild(
     puzzle: &Puzzle,
     expected_blocks: usize,
     remaining_depth: usize,
-    solutions_buffer: &mut Vec<SolutionSegment>,
-    solution_so_far: SolutionSegment,
+    solutions_buffer: &mut Vec<Segment>,
+    solution_so_far: Segment,
+    solutions_left_to_find: Option<&AtomicIsize>,
+    remaining_parallel_depth: usize,
 ) {
-    let SolutionSegment {
+    let Segment {
         state,
         segment_twists,
         ..
@@ -260,11 +279,18 @@ pub fn dfs_blockbuild(
 
     if state.blocks.len() <= expected_blocks {
         // found a solution!
+        if let Some(count) = solutions_left_to_find {
+            count.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        }
         solutions_buffer.push(solution_so_far);
         return;
     }
     if remaining_depth == 0 {
         return; // no more to search; give up
+    }
+
+    if solutions_left_to_find.is_some_and(|n| n.load(std::sync::atomic::Ordering::Relaxed) <= 0) {
+        return; // give up
     }
 
     if !params
@@ -297,18 +323,32 @@ pub fn dfs_blockbuild(
         true
     };
 
-    for grip in puzzle.grips.iter().filter(grip_is_worth_testing) {
-        for twist in grip.twists() {
-            if let Some(new_partial_solution) = solution_so_far.push_twist(twist, last_grip) {
-                dfs_blockbuild(
-                    params,
-                    puzzle,
-                    expected_blocks,
-                    remaining_depth - 1,
-                    solutions_buffer,
-                    new_partial_solution,
-                );
-            }
+    let explore_twist = |twist, solutions_buffer: &mut Vec<Segment>| {
+        if let Some(new_partial_solution) = solution_so_far.push_twist(twist, last_grip) {
+            dfs_blockbuild(
+                params,
+                puzzle,
+                expected_blocks,
+                remaining_depth - 1,
+                solutions_buffer,
+                new_partial_solution,
+                solutions_left_to_find,
+                remaining_parallel_depth.saturating_sub(1),
+            );
         }
+    };
+
+    if remaining_parallel_depth > 0 {
+        let grips = puzzle.grips.par_iter().filter(grip_is_worth_testing);
+        let twists = grips.flat_map(|grip| grip.par_twists());
+        solutions_buffer.par_extend(twists.flat_map_iter(|twist| {
+            let mut solutions_buffer = vec![];
+            explore_twist(twist, &mut solutions_buffer);
+            solutions_buffer
+        }));
+    } else {
+        let grips = puzzle.grips.iter().filter(grip_is_worth_testing);
+        let twists = grips.flat_map(|grip| grip.twists());
+        twists.for_each(|twist| explore_twist(twist, solutions_buffer));
     }
 }

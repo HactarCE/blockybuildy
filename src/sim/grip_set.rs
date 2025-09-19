@@ -276,7 +276,6 @@ impl Block {
     /// - In 4D, only centers and ridges has indistinguishable attitudes.
     ///
     /// The core's attitude is always completely distinguishable.
-    #[must_use]
     pub fn indistinguishable_attitudes(self, ndim: usize) -> StackVec<ElemId, 24> {
         if ndim == 3 && self.layers == PackedLayers::CORE_3D {
             return StackVec::from_iter([self.attitude]).unwrap(); // 3D core is distinguishable
