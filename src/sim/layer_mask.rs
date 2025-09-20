@@ -146,7 +146,7 @@ impl PackedLayers {
         let merge_axis = layer_difference.trailing_zeros() as usize / 4;
         debug_assert!(merge_axis < 4); // otherwise they'd be the same blocks
 
-        if layer_difference & !(0b111 << (merge_axis * 4)) != 0 {
+        if layer_difference >> ((merge_axis + 1) * 4) != 0 {
             return None; // multiple axes have different layers
         }
 
