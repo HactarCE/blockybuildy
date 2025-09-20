@@ -17,7 +17,7 @@ pub struct Group {
     pub inv_elem: [ElemId; ELEM_COUNT],
     pub mul_elem_elem: [[ElemId; ELEM_COUNT]; ELEM_COUNT],
     pub mul_elem_vec: [[Vec4; 4]; ELEM_COUNT],
-    pub mul_elem_grip: [[GripId; 8]; 192],
+    pub mul_elem_grip: [[GripId; 8]; ELEM_COUNT],
 }
 impl Group {
     pub fn bc4() -> Self {
@@ -42,22 +42,22 @@ impl Group {
         let elem_from_matrix =
             |q| ElemId::new(matrices.iter().position(|&m| m == q).unwrap() as u8);
 
-        let mul_elem_elem: [[ElemId; 192]; 192] = matrices
+        let mul_elem_elem: [[ElemId; ELEM_COUNT]; ELEM_COUNT] = matrices
             .iter()
             .map(|&a| {
                 matrices
                     .iter()
                     .map(|&b| elem_from_matrix(matmul(a, b)))
-                    .collect_array::<192>()
+                    .collect_array::<ELEM_COUNT>()
                     .unwrap()
             })
-            .collect_array::<192>()
+            .collect_array::<ELEM_COUNT>()
             .unwrap();
 
-        let mul_elem_vec: [[Vec4; 4]; 192] = matrices
+        let mul_elem_vec: [[Vec4; 4]; ELEM_COUNT] = matrices
             .iter()
             .map(|&m| [X, Y, Z, W].map(|v| vecmul(m, v)))
-            .collect_array::<192>()
+            .collect_array::<ELEM_COUNT>()
             .unwrap();
 
         let mul_elem_grip = mul_elem_vec.map(|mat| {
