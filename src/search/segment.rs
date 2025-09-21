@@ -1,9 +1,5 @@
-use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Index;
-use std::ops::RangeInclusive;
-
-use itertools::Itertools;
 
 use super::SolutionMetadata;
 use crate::StackVec;
@@ -99,8 +95,7 @@ pub struct SegmentStore {
     scramble: Vec<Twist>,
 
     segments: Vec<Segment>,
-    // for each step, for each total twist count, for each depth that they've already been searched, a list of solutions
-    steps: Vec<BTreeMap<usize, Vec<Vec<SegmentId>>>>,
+    steps: Vec<Vec<SegmentId>>,
 }
 impl Index<SegmentId> for SegmentStore {
     type Output = Segment;
@@ -114,7 +109,7 @@ impl SegmentStore {
         Self {
             scramble,
             segments: vec![Segment::default()],
-            steps: vec![BTreeMap::from_iter([(0, vec![vec![SegmentId::INIT]])])],
+            steps: vec![vec![SegmentId::INIT]],
         }
     }
 
@@ -122,64 +117,19 @@ impl SegmentStore {
         let start = self.segments.len();
         self.segments.extend(segments);
         let end = self.segments.len();
-        self.push_batch(step, 0, (start..end).map(SegmentId));
+        self.push_batch(step, (start..end).map(SegmentId));
     }
 
-    pub fn push_batch(
-        &mut self,
-        step: usize,
-        depth: usize,
-        segment_ids: impl Iterator<Item = SegmentId>,
-    ) {
+    pub fn push_batch(&mut self, step: usize, segment_ids: impl Iterator<Item = SegmentId>) {
         crate::extend_vec_to_index(&mut self.steps, step);
-        let twist_counts_at_step = &mut self.steps[step];
+        self.steps[step].extend(segment_ids);
+    }
 
-        for id in segment_ids {
-            let segment = &self.segments[id.0];
-
-            let depths = twist_counts_at_step
-                .entry(segment.total_twist_count)
-                .or_default();
-
-            crate::extend_vec_to_index(depths, depth);
-            depths[depth].push(id);
+    pub fn segment_ids_for_step(&mut self, step: usize) -> &[SegmentId] {
+        match self.steps.get(step) {
+            Some(ids) => ids,
+            None => &[],
         }
-    }
-
-    pub fn take_all_from_step(&mut self, step: usize) -> Option<Vec<SegmentId>> {
-        let mut ret = vec![];
-        let twist_counts = std::mem::take(self.steps.get_mut(step)?);
-        for (_twist_count, depths) in twist_counts {
-            ret.extend(
-                depths.into_iter().flatten().sorted_by(|id1, id2| {
-                    self.segments[id1.0].cmp(&self.segments[id2.0]).reverse()
-                }),
-            );
-        }
-        Some(ret)
-    }
-
-    pub fn pop_batch(
-        &mut self,
-        step: usize,
-        twist_count: usize,
-        depth: usize,
-        batch_size: usize,
-    ) -> Option<Vec<SegmentId>> {
-        let ids = self
-            .steps
-            .get_mut(step)?
-            .get_mut(&twist_count)?
-            .get_mut(depth)?;
-        ids.sort_by(|id1, id2| self.segments[id1.0].cmp(&self.segments[id2.0]).reverse());
-        Some(ids.drain(ids.len().saturating_sub(batch_size)..).collect())
-    }
-
-    pub fn twist_count_range(&self, step: usize) -> Option<RangeInclusive<usize>> {
-        Some(
-            *self.steps.get(step)?.first_key_value()?.0
-                ..=*self.steps.get(step)?.last_key_value()?.0,
-        )
     }
 
     pub fn solution_twists_for_segment(&self, id: SegmentId) -> Vec<Twist> {
@@ -204,11 +154,7 @@ impl SegmentStore {
     pub fn best_solution_so_far(&self) -> Option<SegmentId> {
         self.steps
             .last()? // last step
-            .first_key_value()? // shortest move count
-            .1
-            .iter()
-            .flatten()
-            .next()
+            .first()
             .copied()
     }
 

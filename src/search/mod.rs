@@ -206,15 +206,13 @@ impl Solver {
     ) -> Vec<Segment> {
         let t = std::time::Instant::now();
 
-        let step = self.segments.next_step(); // TODO: does not generalize
+        let step = self.segments.next_step();
         let last_step = step - 1;
-        let segments_to_search_from = self
-            .segments
-            .take_all_from_step(last_step)
-            .unwrap_or_default();
+        let segments_to_search_from = self.segments.segment_ids_for_step(last_step).to_vec();
 
         let mut new_solution_segments = continue_solutions(self, &segments_to_search_from);
 
+        // Sort by twist count and remove duplicates
         new_solution_segments.sort();
         new_solution_segments.dedup();
 
