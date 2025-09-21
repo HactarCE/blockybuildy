@@ -138,6 +138,8 @@ impl Solver {
     fn do_blockbuilding_step(&mut self, block_target: usize) {
         let step = self.segments.next_step(); // TODO: bad
 
+        let mut max_depth = 0;
+
         let new_segments = self.do_step(|this, prev_segments| {
             let mut new_segments = vec![];
             for depth in 0..=this.params.max_depth {
@@ -175,6 +177,7 @@ impl Solver {
                         .take_any(solutions_left_to_find),
                 );
 
+                max_depth = depth;
                 if new_segments.len() >= desired_solution_count {
                     break;
                 }
@@ -188,7 +191,7 @@ impl Solver {
             .min()
             .unwrap_or(0);
         overprintln!(
-            "  Blockbuilt to {block_target} ({} solutions; best is {} ETM)",
+            "  Blockbuilt to {block_target} with max depth {max_depth} ({} solutions; best is {} ETM)",
             new_segments.len(),
             min_twist_count,
         );
