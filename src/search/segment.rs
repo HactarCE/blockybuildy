@@ -26,7 +26,9 @@ impl fmt::Display for Segment {
     }
 }
 impl Segment {
-    /// Assertion that `std::mem::size_of::<Self>() == 128`
+    /// Assertion that `std::mem::size_of::<Self>() == 128`.
+    ///
+    /// It doesn't matter that much, but it's nice to keep it small if we can.
     #[allow(unused)]
     const SIZE_ASSERT: [u8; 128] = [0; std::mem::size_of::<Self>()];
 

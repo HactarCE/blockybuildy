@@ -41,9 +41,9 @@ F2L is solved in 8 stages of blockbuilding:
 | Mid + left         | 2×2×2×2 (initial)                   |   16    |   2×2×2×2 = 16    |       16       |       1       |
 |                    | 2×2×3×2 (extend Y)                  |    4    |    2×2×1×2 = 8    |       9        |       1       |
 |                    | 2×3×3×2 (extend Z)                  |    3    |   2×1×3×2 = 12    |       13       |       1       |
-| Right (mid + back) | 2×2×2×1 (intial)                    |    8    |    2×2×2×1 = 8    |       9        |       2       |
-|                    | 2×2×3×1 (extend Y)                  |    2    |    2×2×1×1 = 4    |       6        |       2       |
-| End                | 2×3×3×3 (F2L)                       |    1    |    1×3×1×2 = 2    |       5        |       1       |
+| Right (mid + back) | 1×2×2×2 (intial)                    |    8    |    2×2×2×1 = 8    |       9        |       2       |
+|                    | 1×2×3×2 (extend Y)                  |    2    |    2×2×1×1 = 4    |       6        |       2       |
+| End                | 3×3×3×2 (F2L)                       |    1    |    1×3×1×2 = 2    |       5        |       1       |
 
 - Note 1: The XYZW axes in this table roughly correspond to the XYZW axes of the [3-Block](https://hypercubing.xyz/methods/3x3x3x3/3block/) solving method.
 - Note 2: Each stage has multiple options due to the symmetry of the puzzle.
