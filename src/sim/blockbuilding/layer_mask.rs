@@ -1,9 +1,7 @@
 use std::fmt;
 use std::ops::{BitAnd, BitOr, BitXor, Mul};
 
-use super::elements::*;
-use super::grip_set::GripSet;
-use super::grips::*;
+use crate::sim::common::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum GripStatus {
@@ -289,7 +287,6 @@ mod tests {
     use proptest::prelude::*;
 
     use super::*;
-    use crate::{HYPERCUBE_ROTATIONS, IDENT};
 
     #[test]
     fn test_transform_layer_mask() {

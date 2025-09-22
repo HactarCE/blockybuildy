@@ -1,10 +1,40 @@
 use std::fmt;
+use std::ops::Mul;
 
 use itertools::Itertools;
 
 use super::group;
-use super::ops::TransformByElem;
 use super::space::*;
+
+/// Identity group element.
+pub const IDENT: ElemId = ElemId::new(0);
+/// Rotation from +X to +Y.
+pub const XY: ElemId = ElemId::new(1);
+/// Rotation from +X to +Z.
+pub const XZ: ElemId = ElemId::new(2);
+/// Rotation from +X to +W.
+pub const XW: ElemId = ElemId::new(3);
+
+/// Rotation from +Y to +X.
+pub const YX: ElemId = ElemId::new(13); // XY * XY * XY
+/// Rotation from +Z to +X.
+pub const ZX: ElemId = ElemId::new(25); // XZ * XZ * XZ
+/// Rotation from +W to +X.
+pub const WX: ElemId = ElemId::new(36); // XW * XW * XW
+
+/// Rotation from +Y to +Z.
+pub const YZ: ElemId = ElemId::new(97); // XZ * YX * ZX
+/// Rotation from +Y to +W.
+pub const YW: ElemId = ElemId::new(110); // XW * YX * WX
+/// Rotation from +Z to +Y.
+pub const ZY: ElemId = ElemId::new(84); // XY * ZX * YX
+/// Rotation from +W to +Y.
+pub const WY: ElemId = ElemId::new(86); // XY * WX * YX
+
+/// Rotation from +Z to +W.
+pub const ZW: ElemId = ElemId::new(133); // XW * ZX * WX
+/// Rotation from +W to +Z.
+pub const WZ: ElemId = ElemId::new(128); // XZ * WX * ZX
 
 #[static_init::dynamic]
 pub static X_STABILIZER: [ElemId; 24] = vector_stabilizer(X);
@@ -117,35 +147,38 @@ impl fmt::Display for ElemId {
     }
 }
 
-/// Identity group element.
-pub const IDENT: ElemId = ElemId::new(0);
-/// Rotation from +X to +Y.
-pub const XY: ElemId = ElemId::new(1);
-/// Rotation from +X to +Z.
-pub const XZ: ElemId = ElemId::new(2);
-/// Rotation from +X to +W.
-pub const XW: ElemId = ElemId::new(3);
+impl Mul for ElemId {
+    type Output = ElemId;
 
-/// Rotation from +Y to +X.
-pub const YX: ElemId = ElemId::new(13); // XY * XY * XY
-/// Rotation from +Z to +X.
-pub const ZX: ElemId = ElemId::new(25); // XZ * XZ * XZ
-/// Rotation from +W to +X.
-pub const WX: ElemId = ElemId::new(36); // XW * XW * XW
+    #[inline]
+    fn mul(self, rhs: Self) -> Self::Output {
+        self.hint_assert_in_bounds();
+        rhs.hint_assert_in_bounds();
+        group::CHIRAL_BC4.mul_elem_elem[self.id() as usize][rhs.id() as usize]
+    }
+}
 
-/// Rotation from +Y to +Z.
-pub const YZ: ElemId = ElemId::new(97); // XZ * YX * ZX
-/// Rotation from +Y to +W.
-pub const YW: ElemId = ElemId::new(110); // XW * YX * WX
-/// Rotation from +Z to +Y.
-pub const ZY: ElemId = ElemId::new(84); // XY * ZX * YX
-/// Rotation from +W to +Y.
-pub const WY: ElemId = ElemId::new(86); // XY * WX * YX
+impl Mul<Vec4> for ElemId {
+    type Output = Vec4;
 
-/// Rotation from +Z to +W.
-pub const ZW: ElemId = ElemId::new(133); // XW * ZX * WX
-/// Rotation from +W to +Z.
-pub const WZ: ElemId = ElemId::new(128); // XZ * WX * ZX
+    #[inline]
+    fn mul(self, rhs: Vec4) -> Self::Output {
+        self.hint_assert_in_bounds();
+        let mat = group::CHIRAL_BC4.mul_elem_vec[self.id() as usize];
+        mat[0] * rhs.x + mat[1] * rhs.y + mat[2] * rhs.z + mat[3] * rhs.w
+    }
+}
+
+pub trait TransformByElem {
+    fn transform_by(self, elem: ElemId) -> Self;
+}
+
+impl TransformByElem for ElemId {
+    #[inline]
+    fn transform_by(self, elem: ElemId) -> Self {
+        elem * self * elem.inv()
+    }
+}
 
 fn elems_iter() -> impl Iterator<Item = ElemId> {
     (0..group::ELEM_COUNT).map(|i| ElemId::new(i as u8))

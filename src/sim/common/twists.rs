@@ -51,6 +51,16 @@ impl fmt::Display for Twist {
     }
 }
 
+impl TransformByElem for Twist {
+    #[inline]
+    fn transform_by(self, elem: ElemId) -> Self {
+        Twist {
+            grip: elem * self.grip,
+            transform: elem.transform(self.transform),
+        }
+    }
+}
+
 fn twist_names_3d() -> HashMap<Twist, String> {
     let r = Twist::new(R, ZY);
     let r2 = Twist::new(R, ZY * ZY);

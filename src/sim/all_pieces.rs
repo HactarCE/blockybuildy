@@ -72,9 +72,8 @@ const fn adjust_index(i: usize) -> usize {
 mod tests {
     use std::collections::HashSet;
 
-    use crate::HYPERCUBE_GRIPS;
-
     use super::*;
+    use crate::HYPERCUBE_GRIPS;
 
     fn unpack_index(mut i: usize) -> [usize; 4] {
         if i >= 1 + 3 + 9 + 27 {

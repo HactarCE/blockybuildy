@@ -3,10 +3,8 @@ use std::fmt;
 
 use itertools::Itertools;
 
-use super::grip_set::{Block, Piece};
-use super::puzzle::Puzzle;
-use super::twists::Twist;
 use crate::StackVec;
+use crate::sim::*;
 
 /// (64 bytes) State of a puzzle, tracked using [`crate::MAX_BLOCKS`] blocks.
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -150,7 +148,7 @@ mod tests {
             };
             for t in last_layer_twist_seq
                 .split_ascii_whitespace()
-                .map(|s| twists::TWISTS_FROM_NAME[s])
+                .map(|s| TWISTS_FROM_NAME[s])
             {
                 state = state.do_twist(t, ndim).unwrap();
             }

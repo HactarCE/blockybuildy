@@ -1,22 +1,9 @@
-mod all_pieces;
-mod elements;
-mod grip_set;
-mod grips;
-mod group;
-mod layer_mask;
-mod ops;
+pub mod all_pieces;
+pub mod blockbuilding;
+pub mod common;
 mod puzzle;
-mod space;
-mod state;
-mod twists;
 
-pub use all_pieces::AllPieces;
-pub use elements::*;
-pub use grip_set::*;
-pub use grips::*;
-pub use layer_mask::*;
-pub use ops::TransformByElem;
+pub use all_pieces::*;
+pub use blockbuilding::*;
+pub use common::*;
 pub use puzzle::*;
-pub use space::*;
-pub use state::*;
-pub use twists::*;

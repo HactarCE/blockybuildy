@@ -3,10 +3,7 @@ use rand::Rng;
 use rand::seq::IndexedRandom;
 use rayon::prelude::*;
 
-use super::elements::{CUBE_ROTATIONS, ElemId, HYPERCUBE_ROTATIONS};
-use super::grip_set::GripSet;
-use super::grips::{CUBE_GRIPS, GripId, HYPERCUBE_GRIPS};
-use super::twists::Twist;
+use crate::sim::common::*;
 
 /// 3x3x3x3 facet-turning twisty puzzle.
 #[static_init::dynamic]

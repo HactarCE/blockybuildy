@@ -1,4 +1,5 @@
 use std::fmt;
+use std::ops::Mul;
 
 use super::elements::*;
 use super::group;
@@ -91,5 +92,17 @@ impl GripId {
 
     pub fn can_transform_grip_to_grip(self, start: GripId, end: GripId) -> bool {
         self.axis() != start.axis() && self.axis() != end.axis()
+    }
+}
+
+impl Mul<GripId> for ElemId {
+    type Output = GripId;
+
+    #[inline]
+    fn mul(self, rhs: GripId) -> Self::Output {
+        self.hint_assert_in_bounds();
+        rhs.hint_assert_in_bounds();
+        group::CHIRAL_BC4.mul_elem_grip[self.id() as usize][rhs.id() as usize]
+            .hint_assert_in_bounds()
     }
 }

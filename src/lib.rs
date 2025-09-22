@@ -19,7 +19,8 @@ const MAX_SOLUTION_COUNT: usize = 1_000_000;
 /// Number of moves allowed in a single segment.
 const MAX_SOLUTION_SEGMENT_LEN: usize = 11;
 
-// If we get fewer than this many solutions, try searching deeper to generate more solutions.
+// If we get fewer than this many solutions, try searching deeper to generate
+// more solutions.
 //
 // Multiply these by 2 to get better solutions slower
 const MIN_SOLUTION_COUNT_DEPTH_1: usize = 25_000;

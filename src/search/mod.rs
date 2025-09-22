@@ -13,9 +13,8 @@ use meta::SolutionMetadata;
 pub use params::BlockBuildingSearchParams;
 pub use segment::{Segment, SegmentId, SegmentStore};
 
-use crate::MAX_SOLUTION_COUNT;
-use crate::Profile;
 use crate::sim::*;
+use crate::{MAX_SOLUTION_COUNT, Profile};
 
 pub struct Solver {
     profile: Profile,
