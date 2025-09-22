@@ -1,3 +1,4 @@
+mod all_pieces;
 mod elements;
 mod grip_set;
 mod grips;
@@ -9,6 +10,7 @@ mod space;
 mod state;
 mod twists;
 
+pub use all_pieces::AllPieces;
 pub use elements::*;
 pub use grip_set::*;
 pub use grips::*;
