@@ -144,7 +144,7 @@ impl PackedLayers {
         let rhs = other.to_u16();
         let layer_difference = lhs ^ rhs;
         let merge_axis = layer_difference.trailing_zeros() as usize / 4;
-        debug_assert!(merge_axis < 4); // otherwise they'd be the same blocks
+        debug_assert!(merge_axis < 4, "same block!"); // otherwise they'd be the same blocks
 
         if layer_difference.unbounded_shr((merge_axis as u32 + 1) * 4) != 0 {
             return None; // multiple axes have different layers
@@ -323,6 +323,10 @@ mod tests {
                 | (axis_options[xs[6]] << 8)
                 | (axis_options[xs[7]] << 12),
         );
+
+        if l1 == l2 {
+            return;
+        }
 
         let merge_axis = (0..4)
             .filter(|&axis| l1.bits_for_axis(axis) != l2.bits_for_axis(axis))

@@ -51,7 +51,9 @@ impl GripSet {
 }
 impl FromIterator<GripId> for GripSet {
     fn from_iter<T: IntoIterator<Item = GripId>>(iter: T) -> Self {
-        Self(iter.into_iter().map(|g| 1 << g.id()).sum())
+        iter.into_iter()
+            .map(|g| Self(1 << g.id()))
+            .fold(Self::NONE, |a, b| a | b)
     }
 }
 impl fmt::Debug for GripSet {
@@ -423,6 +425,10 @@ mod tests {
 
         assert!(!b1.layers.is_empty_on_any_axis());
         assert!(!b2.layers.is_empty_on_any_axis());
+
+        if b1.layers == b2.layers {
+            return; // don't try to merge same blocks
+        }
 
         let mut b1_attitudes = b1.indistinguishable_attitudes(ndim).collect_vec();
         let b2_attitudes = b2.indistinguishable_attitudes(ndim).collect_vec();
