@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn parse_twists(s: &str) -> Vec<Twist> {
+pub fn parse_twists(s: &str) -> Vec<Twist> {
     s.split_whitespace()
         .map(|word| TWISTS_FROM_NAME[word])
         .collect()

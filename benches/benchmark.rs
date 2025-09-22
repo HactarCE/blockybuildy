@@ -4,7 +4,7 @@ use robodoan::*;
 
 const NDIM: usize = 4;
 
-fn exec_moves(init_state: PuzzleState, twists: &[Twist]) -> PuzzleState {
+fn exec_moves(init_state: BlockSet, twists: &[Twist]) -> BlockSet {
     twists.iter().fold(init_state, |state, &twist| {
         state.do_twist(twist, NDIM).unwrap()
     })
@@ -21,7 +21,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let move_count = 32;
     let gen_random_moves = move || puzzle.random_moves(&mut rng, move_count);
 
-    let puzzle_with_2x2x2x2_block = PuzzleState::default()
+    let puzzle_with_2x2x2x2_block = BlockSet::default()
         .add_block_with_setup_moves(puzzle, &[], Block::new_solved([], [R, U, F, O]).unwrap())
         .unwrap();
 

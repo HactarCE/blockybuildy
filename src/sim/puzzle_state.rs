@@ -1,18 +1,18 @@
 use crate::{ElemId, GripId, IDENT, Twist};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct AllPieces {
+pub struct PuzzleState {
     /// Piece attitudes, excluding 1 core and 8 centers.
     piece_attitudes: [ElemId; 72],
 }
-impl Default for AllPieces {
+impl Default for PuzzleState {
     fn default() -> Self {
         Self {
             piece_attitudes: [IDENT; 72],
         }
     }
 }
-impl AllPieces {
+impl PuzzleState {
     pub fn do_twist(&mut self, twist: Twist) {
         let indices = INDICES_FOR_GRIP[twist.grip.id() as usize];
 

@@ -253,6 +253,7 @@ impl Solver {
 /// results in at most `expected_blocks` blocks.
 ///
 /// Results are accumulated into `solutions_buffer`.
+#[allow(clippy::too_many_arguments)]
 pub fn dfs_blockbuild(
     params: BlockBuildingSearchParams,
     puzzle: &Puzzle,

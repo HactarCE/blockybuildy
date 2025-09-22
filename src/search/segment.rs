@@ -8,7 +8,7 @@ use crate::sim::*;
 /// Segment of a solution.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Segment {
-    pub state: PuzzleState, // 64 bytes
+    pub state: BlockSet, // 64 bytes
     pub segment_twists: StackVec<Twist, { crate::MAX_SOLUTION_SEGMENT_LEN }>, // 23 bytes
     pub previous_segment: SegmentId, // 16 bytes
     pub total_twist_count: usize, // 8 bytes

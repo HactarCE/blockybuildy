@@ -18,7 +18,7 @@ impl Heuristic {
     pub fn might_be_solvable(
         self,
         puzzle: &Puzzle,
-        state: PuzzleState,
+        state: BlockSet,
         expected_blocks: usize,
         remaining_moves: usize,
     ) -> bool {
@@ -42,7 +42,7 @@ impl Heuristic {
     fn grip_theoretic_limit(
         self,
         puzzle: &Puzzle,
-        state: PuzzleState,
+        state: BlockSet,
         remaining_moves: usize,
     ) -> usize {
         let ndim = puzzle.ndim;

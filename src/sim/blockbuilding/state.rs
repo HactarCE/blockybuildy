@@ -9,10 +9,16 @@ use crate::sim::*;
 /// (64 bytes) State of a puzzle, tracked using [`crate::MAX_BLOCKS`] blocks.
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(align(64))]
-pub struct PuzzleState {
+pub struct BlockSet {
     pub blocks: StackVec<Block, { crate::MAX_BLOCKS }>,
 }
-impl PuzzleState {
+impl BlockSet {
+    /// Assertion that `std::mem::size_of::<Self>() == 64`.
+    ///
+    /// It doesn't matter that much, but it's nice to keep it small if we can.
+    #[allow(unused)]
+    const SIZE_ASSERT: [u8; 64] = [0; std::mem::size_of::<Self>()];
+
     /// Applies a twist and returns the new state.
     ///
     /// Returns `None` if the twist failed because there are too many blocks to
@@ -109,7 +115,7 @@ impl PuzzleState {
         ))
     }
 }
-impl fmt::Display for PuzzleState {
+impl fmt::Display for BlockSet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[")?;
         write!(f, "{}", self.blocks.iter().join(", "))?;
@@ -143,7 +149,7 @@ mod tests {
         let ndim = 3;
 
         for (should_be_solved, last_layer_twist_seq) in last_layer_algs {
-            let mut state = PuzzleState {
+            let mut state = BlockSet {
                 blocks: StackVec::from_iter([Block::new_solved([], [U]).unwrap()]).unwrap(),
             };
             for t in last_layer_twist_seq
