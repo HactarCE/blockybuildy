@@ -92,7 +92,7 @@ impl SegmentId {
 }
 
 pub struct SegmentStore {
-    scramble: Vec<Twist>,
+    pub scramble: Vec<Twist>,
 
     segments: Vec<Segment>,
     steps: Vec<Vec<SegmentId>>,
@@ -151,11 +151,8 @@ impl SegmentStore {
             .collect()
     }
 
-    pub fn best_solution_so_far(&self) -> Option<SegmentId> {
-        self.steps
-            .last()? // last step
-            .first()
-            .copied()
+    pub fn best_solutions_so_far(&self) -> Option<&Vec<SegmentId>> {
+        self.steps.last()
     }
 
     pub fn next_step(&self) -> usize {

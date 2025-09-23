@@ -16,11 +16,35 @@ impl PuzzleState {
     pub fn do_twist(&mut self, twist: Twist) {
         let indices = INDICES_FOR_GRIP[twist.grip.id() as usize];
 
-        dbg!(indices);
-
         for i in indices {
             self.piece_attitudes[i] = twist.transform * self.piece_attitudes[i];
         }
+    }
+    pub fn do_twists(&mut self, twists: &[Twist]) {
+        for &twist in twists {
+            self.do_twist(twist);
+        }
+    }
+    pub fn oriented_pieces(&self, last_layer: GripId) -> [usize; 3] {
+        let piece_indices = INDICES_FOR_GRIP[last_layer.id() as usize];
+        let is_piece_oriented = |&i: &usize| {
+            self.piece_attitudes[piece_indices[i]] * last_layer.vec() == last_layer.vec()
+        };
+
+        let ridges = [4, 10, 12, 13, 15, 21]
+            .into_iter()
+            .filter(is_piece_oriented)
+            .count();
+        let edges = [1, 3, 5, 7, 9, 11, 14, 16, 18, 20, 22, 24]
+            .into_iter()
+            .filter(is_piece_oriented)
+            .count();
+        let corners = [0, 2, 6, 8, 17, 19, 23, 25]
+            .into_iter()
+            .filter(is_piece_oriented)
+            .count();
+
+        [ridges, edges, corners]
     }
 }
 

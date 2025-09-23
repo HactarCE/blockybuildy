@@ -63,17 +63,49 @@ impl Solver {
         println!("\nTotal elapsed time: {:?}", start.elapsed());
 
         println!();
-        let best_solution = self.segments.best_solution_so_far().unwrap();
+        let best_solution = *self
+            .segments
+            .best_solutions_so_far()
+            .unwrap()
+            .first()
+            .unwrap();
         println!("Best solution: {}", self.segments[best_solution]);
-        println!(
-            "{}",
-            self.segments
-                .solution_twists_for_segment(best_solution)
-                .iter()
-                .join(" ")
-        );
+        let twists_of_best_solution = self.segments.solution_twists_for_segment(best_solution);
+        println!("{}", twists_of_best_solution.iter().join(" "));
 
-        self.segments.solution_twists_for_segment(best_solution)
+        let mut initial_state = PuzzleState::default();
+        initial_state.do_twists(&self.segments.scramble);
+
+        let all_solutions = self
+            .segments
+            .best_solutions_so_far()
+            .unwrap()
+            .iter()
+            .map(|&id| {
+                let segment = &self.segments[id];
+                let twists = self.segments.all_prior_twists_for_segment(id);
+                let mut state = initial_state.clone();
+                state.do_twists(&twists);
+                let orientation_score = state.oriented_pieces(segment.meta.last_layer());
+                (twists.len(), orientation_score, twists)
+            })
+            .sorted();
+
+        let out_file_name = "out.txt";
+        std::fs::write(
+            out_file_name,
+            all_solutions
+                .into_iter()
+                .map(|(twist_count, orientation_score, twists)| {
+                    let twists_str = twists.iter().join(" ");
+                    format!("{twist_count:3} {orientation_score:2?}    {twists_str}")
+                })
+                .join("\n"),
+        )
+        .unwrap();
+        println!("All solutions written to {out_file_name}");
+
+        twists_of_best_solution
     }
 
     fn do_blockbuilding_stage<I: IntoIterator<Item = (Block, SolutionMetadata)>>(

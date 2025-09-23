@@ -28,7 +28,7 @@ impl SolutionMetadata {
         self.last_layer = Some(grip);
         self
     }
-    fn last_layer(self) -> GripId {
+    pub fn last_layer(self) -> GripId {
         self.last_layer.unwrap()
     }
 
