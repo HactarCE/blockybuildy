@@ -13,11 +13,11 @@ pub struct BlockSet {
     pub blocks: StackVec<Block, { crate::MAX_BLOCKS }>,
 }
 impl BlockSet {
-    /// Assertion that `std::mem::size_of::<Self>() == 64`.
-    ///
-    /// It doesn't matter that much, but it's nice to keep it small if we can.
-    #[allow(unused)]
-    const SIZE_ASSERT: [u8; 64] = [0; std::mem::size_of::<Self>()];
+    // /// Assertion that `std::mem::size_of::<Self>() == 64`.
+    // ///
+    // /// It doesn't matter that much, but it's nice to keep it small if we can.
+    // #[allow(unused)]
+    // const SIZE_ASSERT: [u8; 64] = [0; std::mem::size_of::<Self>()];
 
     /// Applies a twist and returns the new state.
     ///

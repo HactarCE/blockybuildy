@@ -99,7 +99,7 @@ impl ElemId {
         // SAFETY: `ElemId` is only ever constructed using `ElemId::new()`,
         // which panics if the ID is greater than or equal to
         // [`group::ELEM_COUNT`].
-        unsafe { std::hint::assert_unchecked(self.0 < group::ELEM_COUNT as u8) }
+        // unsafe { std::hint::assert_unchecked(self.0 < group::ELEM_COUNT as u8) }
     }
 
     /// Returns the internal ID.

@@ -1,6 +1,6 @@
 use crate::{ElemId, GripId, IDENT, Twist};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PuzzleState {
     /// Piece attitudes, excluding 1 core and 8 centers.
     piece_attitudes: [ElemId; 72],
@@ -15,8 +15,6 @@ impl Default for PuzzleState {
 impl PuzzleState {
     pub fn do_twist(&mut self, twist: Twist) {
         let indices = INDICES_FOR_GRIP[twist.grip.id() as usize];
-
-        dbg!(indices);
 
         for i in indices {
             self.piece_attitudes[i] = twist.transform * self.piece_attitudes[i];
@@ -57,14 +55,32 @@ const fn indices_for_grip(g: GripId) -> [usize; 26] {
     ret
 }
 
-const fn adjust_index(i: usize) -> usize {
-    const CORE: usize = 1 + 3 + 9 + 27;
-    if i == CORE {
-        panic!()
-    } else if i < CORE {
-        i
-    } else {
-        i - 1
+const fn adjust_index(mut i: usize) -> usize {
+    let excluded_pieces = [
+        13, // O center [1, 1, 1, 0]
+        31, // F center [1, 1, 0, 1]
+        37, // U center [1, 0, 1, 1]
+        39, // R center [0, 1, 1, 1]
+        40, //   core   [1, 1, 1, 1]
+        41, // L center [2, 1, 1, 1]
+        43, // D center [1, 2, 1, 1]
+        49, // B center [1, 1, 2, 1]
+        67, // I center [1, 1, 1, 2]
+    ];
+
+    let mut j = excluded_pieces.len() - 1;
+    loop {
+        if i == excluded_pieces[j] {
+            panic!("bad index");
+        }
+        if i > excluded_pieces[j] {
+            i -= 1;
+        }
+
+        if j == 0 {
+            return i;
+        }
+        j -= 1;
     }
 }
 

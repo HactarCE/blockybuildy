@@ -2,6 +2,7 @@
 mod macros;
 pub mod mc4d;
 pub mod search;
+pub mod search2;
 pub mod sim;
 pub mod stackvec;
 
@@ -11,13 +12,13 @@ pub use stackvec::StackVec;
 pub use crate::search::*;
 
 /// Maximum number of blocks representable in a puzzle.
-pub const MAX_BLOCKS: usize = 21; // 63 bytes (+1 for length)
+pub const MAX_BLOCKS: usize = 41; // ≤128 bytes
 
 /// If we get more than this many solutions, truncate to this many.
 const MAX_SOLUTION_COUNT: usize = 1_000_000;
 
-/// Number of moves allowed in a single segment.
-const MAX_SOLUTION_SEGMENT_LEN: usize = 11;
+/// Maximum number of moves allowed in a single segment.
+const MAX_TWISTS_PER_SEGMENT: usize = 11;
 
 // If we get fewer than this many solutions, try searching deeper to generate
 // more solutions.

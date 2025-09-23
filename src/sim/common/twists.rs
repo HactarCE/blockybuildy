@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::fmt;
 
 use itertools::Itertools;
+#[cfg(test)]
+use proptest::prelude::*;
 
 use super::elements::*;
 use super::grips::*;
@@ -123,4 +125,22 @@ fn hsc1_sort<const N: usize>(grips: [GripId; N]) -> [GripId; N] {
         .filter(|g| grips.contains(g))
         .collect_array()
         .expect("duplicate grips in twist name")
+}
+
+#[cfg(test)]
+impl Arbitrary for Twist {
+    type Parameters = usize;
+
+    fn arbitrary_with(ndim: Self::Parameters) -> Self::Strategy {
+        prop::sample::select(match ndim {
+            0 => &crate::RUBIKS_4D.twists, // default to 4D
+
+            3 => &crate::RUBIKS_3D.twists,
+            4 => &crate::RUBIKS_4D.twists,
+
+            ndim => panic!("invalid dimension {ndim}"),
+        })
+    }
+
+    type Strategy = prop::sample::Select<Twist>;
 }

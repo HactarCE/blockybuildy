@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::atomic::AtomicIsize;
 
 use itertools::Itertools;
@@ -13,8 +14,9 @@ use meta::SolutionMetadata;
 pub use params::BlockBuildingSearchParams;
 pub use segment::{Segment, SegmentId, SegmentStore};
 
+use crate::MAX_SOLUTION_COUNT;
+use crate::Profile;
 use crate::sim::*;
-use crate::{MAX_SOLUTION_COUNT, Profile};
 
 pub struct Solver {
     profile: Profile,
@@ -57,21 +59,44 @@ impl Solver {
         println!("\nSTAGE 5: right (mid + left), 2x2x3x1 block");
         self.do_blockbuilding_stage(self.profile.select(2, 3), |meta| meta.stage5());
 
-        println!("\nSTAGE 6: F2L");
-        self.do_blockbuilding_stage(self.profile.select(1, 1), |meta| meta.stage6());
+        println!("\nSTAGE 6: tripod 2x2x2");
+        self.do_blockbuilding_stage(self.profile.select(3, 3), |meta| meta.stage6());
+
+        // println!("\nSTAGE 7: tripod 2x2x3");
+        // self.do_blockbuilding_stage(self.profile.select(3, 3), |meta| meta.stage7());
+
+        println!("\nSTAGE 7: solve the rest of the puzzle");
+        self.do_blockbuilding_stage(self.profile.select(3, 3), |meta| meta.stage8());
 
         println!("\nTotal elapsed time: {:?}", start.elapsed());
 
         println!();
-        let best_solution = self.segments.best_solution_so_far().unwrap();
+        let best_solution = *self.segments.best_solutions_so_far().first().unwrap();
         println!("Best solution: {}", self.segments[best_solution]);
         println!(
             "{}",
             self.segments
                 .solution_twists_for_segment(best_solution)
-                .iter()
+                .into_iter()
                 .join(" ")
         );
+
+        let out_file_path = "out.txt";
+        std::fs::write(
+            out_file_path,
+            self.segments
+                .best_solutions_so_far()
+                .iter()
+                .map(|&s| {
+                    self.segments
+                        .solution_twists_for_segment(s)
+                        .into_iter()
+                        .join(" ")
+                })
+                .join("\n"),
+        )
+        .unwrap();
+        println!("All solutions written to {out_file_path}");
 
         self.segments.solution_twists_for_segment(best_solution)
     }
@@ -112,7 +137,7 @@ impl Solver {
             .unwrap_or(0);
 
         println!(
-            "  Added pieces ({} options with {} blocks each)",
+            "  {step:02}. Added pieces ({} options with {} blocks each)",
             new_segments.len(),
             init_blocks,
         );
@@ -139,10 +164,12 @@ impl Solver {
 
         let mut max_depth = 0;
 
-        let new_segments = self.do_step(|this, prev_segments| {
+        let mut new_segments = self.do_step(|this, prev_segments| {
             let mut new_segments = vec![];
-            for depth in 0..=this.params.max_depth {
-                let desired_solution_count = match depth {
+            let limit_grip_set = step >= 52;
+            let extra_max_depth = if limit_grip_set { 2 } else { 0 };
+            for depth in 0..=this.params.max_depth + extra_max_depth {
+                let desired_solution_count = match depth.saturating_sub(extra_max_depth) {
                     ..=1 => crate::MIN_SOLUTION_COUNT_DEPTH_1,
                     2 => crate::MIN_SOLUTION_COUNT_DEPTH_2,
                     3 => crate::MIN_SOLUTION_COUNT_DEPTH_3,
@@ -156,6 +183,17 @@ impl Solver {
                     prev_segments
                         .par_iter()
                         .flat_map(|&prev_segment| {
+                            let allowed_grips = if limit_grip_set {
+                                let meta = this.segments[prev_segment].meta;
+                                GripSet::from_iter([
+                                    meta.front_grip(),
+                                    meta.right_grip(),
+                                    meta.last_layer(),
+                                ])
+                            } else {
+                                GripSet::ALL
+                            };
+
                             let mut results = vec![];
                             dfs_blockbuild(
                                 this.params,
@@ -170,6 +208,7 @@ impl Solver {
                                 } else {
                                     0
                                 },
+                                allowed_grips,
                             );
                             results
                         })
@@ -181,19 +220,64 @@ impl Solver {
                     break;
                 }
             }
+
+            // overprint!("  Processing {} solutions ...", prev_segments.len());
+            // let mut solutions_by_initial_state: HashMap<BlockSet, Vec<_>> = HashMap::new();
+            // for (initial_state, final_state, twists) in solutions {
+            //     solutions_by_initial_state
+            //         .entry(initial_state)
+            //         .or_default()
+            //         .push((final_state, twists));
+            // }
+
+            // overprint!("  Applying twists to {} solutions ...", prev_segments.len());
+            // prev_segments
+            //     .into_iter()
+            //     .flat_map(|&id| {
+            //         solutions_by_initial_state
+            //             .get(&this.segments[id].state)
+            //             .into_iter()
+            //             .flatten()
+            //             .map(move |&(final_state, twists)| {
+            //                 this.segments
+            //                     .push_twists_onto_segment(id, final_state, twists)
+            //             })
+            //     })
+            //     .take(crate::MIN_SOLUTION_COUNT_DEPTH_1)
+            //     .collect()
+
             new_segments
         });
 
+        overprint!("  Deduplicating {} solutions ...", new_segments.len());
+        for s in &mut new_segments {
+            s.state.blocks.sort_unstable();
+        }
+        let unique_states: HashSet<BlockSet> =
+            new_segments.iter().map(|segment| segment.state).collect();
         let min_twist_count = new_segments
             .iter()
             .map(|s| s.total_twist_count)
             .min()
             .unwrap_or(0);
         overprintln!(
-            "  Blockbuilt to {block_target} with max depth {max_depth} ({} solutions; best is {} ETM)",
+            "  {step:02}. Blockbuilt to {block_target} with max depth {max_depth} ({} solutions, {} unique; best is {} ETM)",
             new_segments.len(),
+            unique_states.len(),
             min_twist_count,
         );
+        if step > 64 {
+            overprint!("    (finalizing ...)");
+            let all = new_segments.into_iter().into_group_map_by(|s| s.state);
+            new_segments = all
+                .into_values()
+                .filter_map(|possible_new_segments| {
+                    possible_new_segments
+                        .into_iter()
+                        .min_by_key(|s| s.total_twist_count)
+                })
+                .collect_vec();
+        }
 
         self.segments.add_segments(step, new_segments);
     }
@@ -263,6 +347,7 @@ pub fn dfs_blockbuild(
     solution_so_far: Segment,
     solutions_left_to_find: Option<&AtomicIsize>,
     remaining_parallel_depth: usize,
+    grip_subset: GripSet,
 ) {
     let Segment {
         state,
@@ -312,11 +397,14 @@ pub fn dfs_blockbuild(
         if combined_layer_mask.grip_status(grip.id) == GripStatus::Inactive {
             return false; // doesn't move any block
         }
+        if !grip_subset.contains(grip.id) {
+            return false;
+        }
         // TODO: don't check opposite if it was 2nd-to-last move
         true
     };
 
-    let explore_twist = |twist, solutions_buffer: &mut Vec<Segment>| {
+    let explore_twist = |twist, solutions_buffer: &mut Vec<_>| {
         if let Some(new_partial_solution) = solution_so_far.push_twist(twist, last_grip) {
             dfs_blockbuild(
                 params,
@@ -327,6 +415,7 @@ pub fn dfs_blockbuild(
                 new_partial_solution,
                 solutions_left_to_find,
                 remaining_parallel_depth.saturating_sub(1),
+                grip_subset,
             );
         }
     };

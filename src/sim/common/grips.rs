@@ -66,7 +66,7 @@ impl GripId {
     pub const fn hint_assert_in_bounds(self) -> Self {
         // SAFETY: `GripId` is only ever constructed using `GripId::try_new()`,
         // which returns `None` if the ID is greater than or equal to 8.
-        unsafe { std::hint::assert_unchecked(self.0 < 8) };
+        // unsafe { std::hint::assert_unchecked(self.0 < 8) };
         self
     }
 

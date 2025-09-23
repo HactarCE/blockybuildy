@@ -28,7 +28,7 @@ impl SolutionMetadata {
         self.last_layer = Some(grip);
         self
     }
-    fn last_layer(self) -> GripId {
+    pub fn last_layer(self) -> GripId {
         self.last_layer.unwrap()
     }
 
@@ -36,7 +36,7 @@ impl SolutionMetadata {
         self.right_grip = Some(grip);
         self
     }
-    fn right_grip(self) -> GripId {
+    pub fn right_grip(self) -> GripId {
         self.right_grip.unwrap()
     }
 
@@ -44,7 +44,7 @@ impl SolutionMetadata {
         self.front_grip = Some(grip);
         self
     }
-    fn front_grip(self) -> GripId {
+    pub fn front_grip(self) -> GripId {
         self.front_grip.unwrap()
     }
 
@@ -107,8 +107,48 @@ impl SolutionMetadata {
     }
     pub fn stage6(self) -> impl IntoIterator<Item = (Block, Self)> {
         assert_eq!(self.stage, 5);
-        let block =
-            Block::new_solved([self.front_grip(), self.right_grip()], [self.last_layer()]).unwrap();
-        [self.next_stage().with_third_block(block)]
+        let [ax1, ax2, ax3] = [0, 1, 2, 3]
+            .into_iter()
+            .filter(|&axis| axis != self.last_layer().axis())
+            .collect_array()
+            .unwrap();
+        itertools::iproduct!(
+            GripId::pair_on_axis(ax1),
+            GripId::pair_on_axis(ax2),
+            GripId::pair_on_axis(ax3)
+        )
+        .map(move |(g1, g2, g3)| {
+            self.next_stage()
+                .with_third_block(Block::new_solved([self.last_layer()], [g1, g2, g3]).unwrap())
+        })
+    }
+    pub fn stage7(self) -> impl IntoIterator<Item = (Block, Self)> {
+        assert_eq!(self.stage, 6);
+        (self.third_block.inactive_grips() - self.last_layer().opposite())
+            .iter()
+            .map(move |g| {
+                self.next_stage()
+                    .with_third_block(self.third_block.expand_to_active_grip(g))
+            })
+    }
+    pub fn stage8(self) -> impl IntoIterator<Item = (Block, Self)> {
+        [self
+            .next_stage()
+            .with_third_block(Block::new_solved([], []).unwrap())]
+        // let inactive_grips = self.third_block.inactive_grips() - self.last_layer().opposite();
+        // let [g1, g2] = inactive_grips.unwrap_exactly_two();
+
+        // [
+        //     Block::new_solved([self.front_grip(), self.right_grip()], [self.last_layer()]).unwrap(),
+        //     self.third_block
+        //         .expand_to_active_grip(g1)
+        //         .restrict_to_active_grip(g1)
+        //         .unwrap(),
+        //     self.third_block
+        //         .expand_to_active_grip(g2)
+        //         .restrict_to_active_grip(g2)
+        //         .unwrap(),
+        // ]
+        // .map(|block| self.next_stage().with_third_block(block))
     }
 }

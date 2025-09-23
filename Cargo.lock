@@ -612,6 +612,7 @@ dependencies = [
  "rand",
  "rand_pcg",
  "rayon",
+ "smallvec",
  "static_init",
 ]
 

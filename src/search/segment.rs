@@ -9,8 +9,8 @@ use crate::sim::*;
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Segment {
     pub state: BlockSet, // 64 bytes
-    pub segment_twists: StackVec<Twist, { crate::MAX_SOLUTION_SEGMENT_LEN }>, // 23 bytes
-    pub previous_segment: SegmentId, // 16 bytes
+    pub segment_twists: StackVec<Twist, { crate::MAX_TWISTS_PER_SEGMENT }>, // 23 bytes
+    pub previous_segment: SegmentId, // 8 bytes
     pub total_twist_count: usize, // 8 bytes
     pub meta: SolutionMetadata, // 20 bytes
 }
@@ -22,11 +22,11 @@ impl fmt::Display for Segment {
     }
 }
 impl Segment {
-    /// Assertion that `std::mem::size_of::<Self>() == 128`.
-    ///
-    /// It doesn't matter that much, but it's nice to keep it small if we can.
-    #[allow(unused)]
-    const SIZE_ASSERT: [u8; 128] = [0; std::mem::size_of::<Self>()];
+    // /// Assertion that `std::mem::size_of::<Self>() == 128`.
+    // ///
+    // /// It doesn't matter that much, but it's nice to keep it small if we can.
+    // #[allow(unused)]
+    // const SIZE_ASSERT: [u8; 128] = [0; std::mem::size_of::<Self>()];
 
     #[must_use]
     pub fn push_twist(&self, twist: Twist, last_grip: Option<GripId>) -> Option<Self> {
@@ -151,14 +151,58 @@ impl SegmentStore {
             .collect()
     }
 
-    pub fn best_solution_so_far(&self) -> Option<SegmentId> {
+    pub fn best_solutions_so_far(&self) -> &[SegmentId] {
         self.steps
-            .last()? // last step
-            .first()
-            .copied()
+            .iter()
+            .rev()
+            .find(|step_solutions| !step_solutions.is_empty())
+            .unwrap()
     }
 
     pub fn next_step(&self) -> usize {
         self.steps.len()
+    }
+
+    pub fn push_twists_onto_segment(
+        &self,
+        previous_segment_id: SegmentId,
+        new_state: BlockSet,
+        new_twists: StackVec<Twist, { crate::MAX_TWISTS_PER_SEGMENT }>,
+    ) -> Segment {
+        let prev_segment = &self[previous_segment_id];
+
+        // let mut last_grips = self
+        //     .solution_twists_for_segment(previous_segment_id)
+        //     .map(|twist| twist.grip)
+        //     .peekable();
+        // let last_axis = last_grips.peek().map(|g| g.axis()).unwrap_or(usize::MAX); // usize::MAX = no axis is last
+        // let free_grips = GripSet::from_iter(last_grips.filter(|g| g.axis() == last_axis));
+
+        let additional_twist_count = new_twists.len();
+
+        // let mut free_grip_set = prev_segment.free_grip_set;
+        // let free_axis = free_grip_set.iter().next().map(|g| g.axis());
+
+        // let mut additional_twist_count = 0;
+        // for twist in new_twists {
+        //     if free_grip_set.contains(twist.grip) {
+        //         continue;
+        //     } else {
+        //         additional_twist_count += 1;
+        //         if Some(twist.grip.axis()) == free_axis {
+        //             free_grip_set += twist.grip;
+        //         } else {
+        //             free_grip_set = GripSet::from_iter([twist.grip]);
+        //         }
+        //     }
+        // }
+
+        Segment {
+            state: new_state,
+            segment_twists: new_twists,
+            previous_segment: previous_segment_id,
+            total_twist_count: prev_segment.total_twist_count + additional_twist_count,
+            meta: prev_segment.meta,
+        }
     }
 }
