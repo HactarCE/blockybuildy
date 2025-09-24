@@ -43,19 +43,19 @@ impl Solver {
         // Keep the call graph flat for recursion.
 
         println!("\nSTAGE 1: mid + left, 2x2x2x2 block");
-        self.do_blockbuilding_stage(self.profile.select(1, 3), |meta| meta.stage1());
+        self.do_blockbuilding_stage(self.profile.select(1, 5), |meta| meta.stage1());
 
         println!("\nSTAGE 2: mid + left, 2x2x3x2 block");
-        self.do_blockbuilding_stage(self.profile.select(1, 3), |meta| meta.stage2());
+        self.do_blockbuilding_stage(self.profile.select(1, 5), |meta| meta.stage2());
 
         println!("\nSTAGE 3: mid + left, 2x3x3x2 block");
-        self.do_blockbuilding_stage(self.profile.select(2, 1), |meta| meta.stage3());
+        self.do_blockbuilding_stage(self.profile.select(2, 6), |meta| meta.stage3());
 
         println!("\nSTAGE 4: right (mid + left), 2x2x2x1 block");
-        self.do_blockbuilding_stage(self.profile.select(2, 4), |meta| meta.stage4());
+        self.do_blockbuilding_stage(self.profile.select(2, 6), |meta| meta.stage4());
 
         println!("\nSTAGE 5: right (mid + left), 2x2x3x1 block");
-        self.do_blockbuilding_stage(self.profile.select(2, 3), |meta| meta.stage5());
+        self.do_blockbuilding_stage(self.profile.select(2, 5), |meta| meta.stage5());
 
         println!("\nSTAGE 6: F2L");
         self.do_blockbuilding_stage(self.profile.select(1, 1), |meta| meta.stage6());
