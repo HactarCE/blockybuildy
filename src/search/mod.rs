@@ -83,10 +83,10 @@ impl Solver {
             .iter()
             .map(|&id| {
                 let segment = &self.segments[id];
-                let twists = self.segments.all_prior_twists_for_segment(id);
+                let twists = self.segments.solution_twists_for_segment(id);
                 let mut state = initial_state.clone();
                 state.do_twists(&twists);
-                let orientation_score = state.oriented_pieces(segment.meta.last_layer());
+                let orientation_score = state.unoriented_pieces(segment.meta.last_layer());
                 (twists.len(), orientation_score, twists)
             })
             .sorted();

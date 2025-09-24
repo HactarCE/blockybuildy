@@ -23,10 +23,10 @@ const MAX_SOLUTION_SEGMENT_LEN: usize = 11;
 // more solutions.
 //
 // Multiply these by 2 to get better solutions slower
-const MIN_SOLUTION_COUNT_DEPTH_1: usize = 100_000;
-const MIN_SOLUTION_COUNT_DEPTH_2: usize = 50_000;
-const MIN_SOLUTION_COUNT_DEPTH_3: usize = 5000;
-const MIN_SOLUTION_COUNT_DEPTH_4: usize = 500;
+const MIN_SOLUTION_COUNT_DEPTH_1: usize = 10_000;
+const MIN_SOLUTION_COUNT_DEPTH_2: usize = 5_000;
+const MIN_SOLUTION_COUNT_DEPTH_3: usize = 500;
+const MIN_SOLUTION_COUNT_DEPTH_4: usize = 50;
 
 /// Whether to print 3D twist names when possible (e.g., `R` instead of `RO`).
 pub const USE_3D_TWIST_NAMES: bool = false;
@@ -54,4 +54,10 @@ impl Profile {
             Profile::Short => short,
         }
     }
+}
+
+pub fn parse_twists(s: &str) -> Vec<Twist> {
+    s.split_whitespace()
+        .map(|word| TWISTS_FROM_NAME[word])
+        .collect()
 }

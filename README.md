@@ -1,30 +1,30 @@
 # robodoan
 
-Experimental blockbuilding-based search program for solving 3D and [4D Rubik's cubes](https://hypercubing.xyz/puzzles/3×3×3×3/)
+Experimental blockbuilding-based search program for a [4D Rubik's cube](https://hypercubing.xyz/puzzles/3×3×3×3/)
+
+Currently, this solver is only able to complete F2L. I plan on adding OLC and PLC solvers in the future.
 
 ## Performance
 
 On an M2 Max Macbook Pro, here is how the F2L solver performed on 10 random scrambles of a 4-dimensional 3×3×3×3 Rubik's cube:
 
 ```
-107 ETM in 13.211053458s
-104 ETM in 12.477352333s
-111 ETM in 14.642692333s
-110 ETM in 18.660944375s
-104 ETM in 23.77293075s
-100 ETM in 22.303156709s
-108 ETM in 60.120253167s
-107 ETM in 14.792480125s
-99 ETM in 18.923142917s
-109 ETM in 17.819908125s
+69 ETM in 8.97840925s
+70 ETM in 7.331832625s
+67 ETM in 7.840537417s
+68 ETM in 7.571879958s
+71 ETM in 9.166809125s
+68 ETM in 7.999356833s
+68 ETM in 7.219549042s
+70 ETM in 8.134437291s
+69 ETM in 8.066849666s
+68 ETM in 8.181445167s
 
-mean movecount: 105.9 ETM
-mean time: 21.672 seconds
+mean movecount: 68.8 ETM
+mean time: 8.049 seconds
 ```
 
 These are solutions to F2L, not the whole puzzle.
-
-The outliers (1 minute) is due to getting stuck on the last F2L-b pair, which happens ~15±10% of the time.
 
 Move count is approximately STM except for very rare cases where two sequential moves use the same grip, in which case STM would be slightly lower than ETM.
 
@@ -112,11 +112,9 @@ I'm writing this program to give the computer-assisted category some much-needed
 ## Optimizations (to-do)
 
 - [x] search multiple routes at once / meta search over block extensions
-- [ ] consider other representations of rotations that can use smaller LUTs
 - [x] don't move the same grip twice within one search
 - [x] indistinguishable attitudes
 - [x] prune based on optimistic block formation heuristics
-- [x] dynamically adjust goal (may be redundant with pruning)
+- [x] dynamically adjust goal based on depth
 - [ ] NISS
-- [ ] insertions on inactive grips
-- [ ] GPGPU???
+- [ ] don't search duplicates (only consider pieces for current stage)

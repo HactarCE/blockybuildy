@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let mut results = vec![];
-    for i in 0..1 {
+    for i in 0..10 {
         let scramble = RUBIKS_4D.random_moves(&mut rand::rng(), 100);
         println!("\n\n---- STARTING SEARCH #{} ----\n", i + 1);
         println!("Scramble: {}", scramble.iter().join(" "));
@@ -53,10 +53,4 @@ fn main() -> Result<(), Box<dyn Error>> {
     // robodoan::Solver::new(scramble).solve();
 
     Ok(())
-}
-
-pub fn parse_twists(s: &str) -> Vec<Twist> {
-    s.split_whitespace()
-        .map(|word| TWISTS_FROM_NAME[word])
-        .collect()
 }
