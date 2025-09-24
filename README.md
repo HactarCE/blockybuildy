@@ -6,7 +6,15 @@ Currently, this solver is only able to complete F2L. I plan on adding OLC and PL
 
 ## Performance
 
-On an M2 Max Macbook Pro, here is how the F2L solver performed on 10 random scrambles of a 4-dimensional 3×3×3×3 Rubik's cube:
+On an M2 Max Macbook Pro, here is how the F2L solver performed on 10 random scrambles of a 4-dimensional 3×3×3×3 Rubik's cube.
+
+These are solutions to F2L, not the whole puzzle.
+
+Move count is approximately STM except for very rare cases where two sequential moves use the same grip, in which case STM would be slightly lower than ETM.
+
+There are two profiles: "fast" and "short."
+
+### Fast profile
 
 ```
 69 ETM in 8.97840925s
@@ -24,9 +32,23 @@ mean movecount: 68.8 ETM
 mean time: 8.049 seconds
 ```
 
-These are solutions to F2L, not the whole puzzle.
+### Short profile
 
-Move count is approximately STM except for very rare cases where two sequential moves use the same grip, in which case STM would be slightly lower than ETM.
+```
+66 ETM in 17.397143792s
+65 ETM in 17.069599208s
+67 ETM in 16.124495667s
+64 ETM in 16.10172325s
+66 ETM in 19.68221025s
+65 ETM in 18.024998208s
+67 ETM in 17.205043041s
+64 ETM in 15.573559166s
+66 ETM in 18.377754833s
+64 ETM in 13.521910042s
+
+mean movecount: 65.4 ETM
+mean time: 16.908 seconds
+```
 
 ## Solving strategy
 
@@ -34,7 +56,7 @@ Move count is approximately STM except for very rare cases where two sequential 
 
 #### Stages
 
-F2L is solved in 8 stages of blockbuilding:
+F2L is solved in 6 stages of blockbuilding:
 
 | Superstage         | Stage                               | Options | Additional pieces | Initial blocks | Target blocks |
 | ------------------ | ----------------------------------- | :-----: | :---------------: | :------------: | :-----------: |
